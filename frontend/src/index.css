@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-agro-primary: #1B4D3E;
+    --color-agro-primary-hover: #143A2F;
+    --color-agro-primary-light: #256653;
+    
+    --color-agro-accent: #4E9F3D;
+    --color-agro-accent-hover: #3E8230;
+    --color-agro-accent-light: #6DBF5C;
+    
+    --color-agro-dark: #1E1E1E;
+    --color-agro-dark-muted: #4A5568;
+    
+    --color-agro-bg: #F9F9F9;
+    --color-agro-card: #FFFFFF;
+    --color-agro-border: #E2E8F0;
+    --color-agro-text: #1E1E1E;
+    --color-agro-muted: #64748B;
+  }
+
+  .dark {
+    --color-agro-primary: #256653;
+    --color-agro-primary-hover: #1B4D3E;
+    --color-agro-primary-light: #32856D;
+    
+    --color-agro-accent: #6DBF5C;
+    --color-agro-accent-hover: #4E9F3D;
+    --color-agro-accent-light: #8CD67C;
+    
+    --color-agro-dark: #F3F4F6;
+    --color-agro-dark-muted: #9CA3AF;
+    
+    --color-agro-bg: #0F1715;
+    --color-agro-card: #18221F;
+    --color-agro-border: #263632;
+    --color-agro-text: #E5E7EB;
+    --color-agro-muted: #9CA3AF;
+  }
+}
+
+@theme {
+  --color-agro-green-dark: #1B4D3E;
+  --color-agro-green-light: #4E9F3D;
+  --color-agro-black: #1E1E1E;
+  --color-agro-white: #FFFFFF;
+  --color-agro-gray-light: #F9F9F9;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--color-agro-bg);
+  color: var(--color-agro-text);
+  min-height: 100vh;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(27, 77, 62, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(27, 77, 62, 0.4);
+}
