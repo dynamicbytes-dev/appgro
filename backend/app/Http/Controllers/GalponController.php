@@ -92,14 +92,7 @@ class GalponController extends Controller
             'FIBRA'
         ],
     ];
-    /* private const PURPOSES_BY_CATEGORY = [
-        'avícola' => ['carne', 'huevos'],
-        'porcina' => ['carne', 'reproducción'],
-        'cunícola' => ['carne', 'reproducción'],
-        'bovina' => ['carne', 'reproducción', 'leche'],
-        'ovina' => ['carne', 'leche', 'reproducción', 'lana'],
-        'caprina' => ['carne', 'leche', 'reproducción', 'fibra'],
-    ]; */
+    
 
     private function isPurposeAllowedForSpecies(string $purpose, Species $species): bool
     {
