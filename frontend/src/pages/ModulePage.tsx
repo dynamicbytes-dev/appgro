@@ -41,6 +41,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 import { SpeciesView } from './SpeciesView';
 import { GalponesView } from './GalponesView';
+import { LotesView } from './LotesView';
 
 interface ModuleRecord {
   id: string;
@@ -110,9 +111,13 @@ export const ModulePage: React.FC = () => {
     return <GalponesView />;
   }
 
+  if (moduleId === 'lotes' || (moduleId as string) === 'lots') {
+    return <LotesView />;
+  }
+
   const modConfig = moduleId ? SYSTEM_MODULES[moduleId] : null;
 
-  const isLots = moduleId === 'lotes' || (moduleId as string) === 'lots';
+  const isLots = (moduleId as string) === 'lotes' || (moduleId as string) === 'lots';
   const isActivities = moduleId === 'actividades' || (moduleId as string) === 'activities';
 
   // Dynamic records state for current module
@@ -355,7 +360,7 @@ export const ModulePage: React.FC = () => {
               }
               value={recordTitle}
               onChange={(e) => setRecordTitle(e.target.value)}
-              className="w-full p-2.5 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full p-2.5 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
@@ -368,7 +373,7 @@ export const ModulePage: React.FC = () => {
               placeholder="Escribe aquí las observaciones, kilos consumidos, dosificación o detalles..."
               value={recordNote}
               onChange={(e) => setRecordNote(e.target.value)}
-              className="w-full p-3 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full p-3 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
@@ -379,7 +384,7 @@ export const ModulePage: React.FC = () => {
             <select
               value={recordStatus}
               onChange={(e) => setRecordStatus(e.target.value as any)}
-              className="w-full p-2.5 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full p-2.5 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="Verificado">Verificado / Activo</option>
               <option value="En Proceso">En Proceso / Pendiente</option>

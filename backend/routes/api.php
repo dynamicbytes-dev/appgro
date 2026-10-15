@@ -128,10 +128,10 @@ $registerRoutes = function () {
             Route::put('admins/{id}/status', [RootAdminController::class, 'toggleStatus']);
             Route::put('admins/{id}/toggle-status', [RootAdminController::class, 'toggleStatus']);
             Route::post('admins/{id}/toggle-status', [RootAdminController::class, 'toggleStatus']);
-        Route::patch('admin-users/{id}/toggle-status', [RootAdminController::class, 'toggleStatus']);
-        Route::put('admin-users/{id}/toggle-status', [RootAdminController::class, 'toggleStatus']);
-        Route::patch('admin-users/{id}/status', [RootAdminController::class, 'toggleStatus']);
-        Route::put('admin-users/{id}/status', [RootAdminController::class, 'toggleStatus']);
+            Route::patch('admin-users/{id}/toggle-status', [RootAdminController::class, 'toggleStatus']);
+            Route::put('admin-users/{id}/toggle-status', [RootAdminController::class, 'toggleStatus']);
+            Route::patch('admin-users/{id}/status', [RootAdminController::class, 'toggleStatus']);
+            Route::put('admin-users/{id}/status', [RootAdminController::class, 'toggleStatus']);
         });
 
         // Subordinates / Encargados Management (Admin access)
@@ -194,12 +194,61 @@ $registerRoutes = function () {
         Route::middleware('module.access:barns')->get('admin/barns/summary', [BarnController::class, 'stats']);
         Route::middleware('module.access:barns')->get('admin/barns', [BarnController::class, 'index']);
 
-        // Lotes Module ('lots')
+        // Lotes Module ('lots' / alias 'lotes')
         Route::middleware('module.access:lots')->prefix('lots')->group(function () {
+            Route::get('stats', [LotController::class, 'stats']);
+            Route::get('summary', [LotController::class, 'stats']);
             Route::get('/', [LotController::class, 'index']);
             Route::post('/', [LotController::class, 'store']);
             Route::get('{id}', [LotController::class, 'show']);
+            Route::put('{id}', [LotController::class, 'update']);
+            Route::patch('{id}', [LotController::class, 'update']);
+            Route::patch('{id}/status', [LotController::class, 'toggleStatus']);
+            Route::post('{id}/harvest', [LotController::class, 'harvest']);
+            Route::post('{id}/eggs', [LotController::class, 'registerEggs']);
             Route::delete('{id}', [LotController::class, 'destroy']);
+
+            Route::get('{id}/weaned-pending', [LotController::class, 'weanedPending']);
+
+            // Animales individuales (porcinos de reproducción)
+            Route::get('{id}/animals', [LotController::class, 'animals']);
+            Route::post('{id}/animals', [LotController::class, 'storeAnimal']);
+            Route::get('animals/{animalId}', [LotController::class, 'showAnimal']);
+            Route::put('animals/{animalId}', [LotController::class, 'updateAnimal']);
+            Route::patch('animals/{animalId}', [LotController::class, 'updateAnimal']);
+            Route::delete('animals/{animalId}', [LotController::class, 'destroyAnimal']);
+
+            // Historial de servicios (inseminación / monta)
+            Route::get('animals/{animalId}/services', [LotController::class, 'services']);
+            Route::post('animals/{animalId}/services', [LotController::class, 'storeService']);
+            Route::delete('services/{serviceId}', [LotController::class, 'destroyService']);
+        });
+        Route::middleware('module.access:lots')->get('admin/lots/stats', [LotController::class, 'stats']);
+        Route::middleware('module.access:lots')->get('admin/lots/summary', [LotController::class, 'stats']);
+        Route::middleware('module.access:lots')->get('admin/lots', [LotController::class, 'index']);
+
+        // Alias 'lotes' para compatibilidad con el frontend
+        Route::middleware('module.access:lotes')->prefix('lotes')->group(function () {
+            Route::get('stats', [LotController::class, 'stats']);
+            Route::get('summary', [LotController::class, 'stats']);
+            Route::get('/', [LotController::class, 'index']);
+            Route::post('/', [LotController::class, 'store']);
+            Route::get('{id}', [LotController::class, 'show']);
+            Route::put('{id}', [LotController::class, 'update']);
+            Route::patch('{id}', [LotController::class, 'update']);
+            Route::patch('{id}/status', [LotController::class, 'toggleStatus']);
+            Route::post('{id}/harvest', [LotController::class, 'harvest']);
+            Route::post('{id}/eggs', [LotController::class, 'registerEggs']);
+            Route::delete('{id}', [LotController::class, 'destroy']);
+            Route::get('{id}/animals', [LotController::class, 'animals']);
+            Route::post('{id}/animals', [LotController::class, 'storeAnimal']);
+            Route::get('animals/{animalId}', [LotController::class, 'showAnimal']);
+            Route::put('animals/{animalId}', [LotController::class, 'updateAnimal']);
+            Route::patch('animals/{animalId}', [LotController::class, 'updateAnimal']);
+            Route::delete('animals/{animalId}', [LotController::class, 'destroyAnimal']);
+            Route::get('animals/{animalId}/services', [LotController::class, 'services']);
+            Route::post('animals/{animalId}/services', [LotController::class, 'storeService']);
+            Route::delete('services/{serviceId}', [LotController::class, 'destroyService']);
         });
 
         // Historial y Auditoría Module ('history')

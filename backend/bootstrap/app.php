@@ -3,10 +3,16 @@
 use App\Http\Middleware\CheckModuleAccess;
 use App\Http\Middleware\EnsureIsRoot;
 use App\Http\Middleware\JwtAuthMiddleware;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\HandleCors;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
+        $middleware->prepend(HandleCors::class);
         $middleware->alias([
             'jwt.auth' => JwtAuthMiddleware::class,
             'module.access' => CheckModuleAccess::class,
@@ -28,7 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return $request->is('api/*') || $request->wantsJson();
         });
 
-        $exceptions->render(function (\Illuminate\Auth\AuthenticationException $e, Request $request) {
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
             if ($request->is('api/*') || $request->wantsJson()) {
                 return response()->json([
                     'status' => 'error',
@@ -37,7 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, Request $request) {
+        $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->is('api/*') || $request->wantsJson()) {
                 return response()->json([
                     'status' => 'error',
@@ -47,7 +53,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException $e, Request $request) {
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             if ($request->is('api/*') || $request->wantsJson()) {
                 return response()->json([
                     'status' => 'error',
@@ -56,12 +62,23 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (\Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException $e, Request $request) {
+        $exceptions->render(function (AccessDeniedHttpException $e, Request $request) {
             if ($request->is('api/*') || $request->wantsJson()) {
                 return response()->json([
                     'status' => 'error',
                     'message' => $e->getMessage() ?: 'Acceso prohibido. Permisos insuficientes.',
                 ], 403);
+            }
+        });
+
+        // Cualquier abort() con otro código 4xx (p.ej. 422 de negocio) conserva
+        // su status real en lugar de caer en el catch-all de 500.
+        $exceptions->render(function (HttpException $e, Request $request) {
+            if ($request->is('api/*') || $request->wantsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $e->getMessage() ?: 'Error en la solicitud.',
+                ], $e->getStatusCode());
             }
         });
 

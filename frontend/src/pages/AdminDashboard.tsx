@@ -657,7 +657,7 @@ export const AdminDashboard: React.FC = () => {
               placeholder="Ej: José Rodríguez"
               value={subName}
               onChange={(e) => setSubName(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
@@ -672,7 +672,7 @@ export const AdminDashboard: React.FC = () => {
                 placeholder="encargado@granja.com"
                 value={subEmail}
                 onChange={(e) => setSubEmail(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               />
             </div>
 
@@ -686,7 +686,7 @@ export const AdminDashboard: React.FC = () => {
                 placeholder="••••••••"
                 value={subPassword}
                 onChange={(e) => setSubPassword(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               />
             </div>
           </div>
@@ -773,7 +773,7 @@ export const AdminDashboard: React.FC = () => {
                 required
                 value={editSubName}
                 onChange={(e) => setEditSubName(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               />
             </div>
 
@@ -787,7 +787,7 @@ export const AdminDashboard: React.FC = () => {
                   required
                   value={editSubEmail}
                   onChange={(e) => setEditSubEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
 
@@ -800,7 +800,7 @@ export const AdminDashboard: React.FC = () => {
                   placeholder="Dejar en blanco para conservar"
                   value={editSubPassword}
                   onChange={(e) => setEditSubPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>

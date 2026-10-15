@@ -76,7 +76,7 @@ export const LoginPage: React.FC = () => {
                   placeholder="ejemplo@granja.com"
                   required
                   autoComplete="email"
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#1B4D3E] focus:outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-sm focus:ring-2 focus:ring-[#1B4D3E] focus:outline-none transition-all text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>
@@ -94,7 +94,7 @@ export const LoginPage: React.FC = () => {
                   placeholder="••••••••••••"
                   required
                   autoComplete="current-password"
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-[#1B4D3E] focus:outline-none transition-all"
+                  className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-sm focus:ring-2 focus:ring-[#1B4D3E] focus:outline-none transition-all text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 />
               </div>
             </div>

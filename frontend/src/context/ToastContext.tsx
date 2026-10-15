@@ -47,8 +47,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ showToast, toastSuccess, toastError }}>
       {children}
       
-      {/* Toast Notification Container */}
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 max-w-sm w-full pointer-events-none">
+      {/* Toast Notification Container: z-[9999] flota por encima de los modales (z-50) */}
+      <div className="fixed bottom-5 right-5 z-[9999] flex flex-col space-y-2 max-w-sm w-full pointer-events-none">
         {(toasts || []).map((t) => (
           <div
             key={`toast-${t.id}`}

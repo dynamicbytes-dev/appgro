@@ -1,4 +1,4 @@
-import React, { useEffect, useState, type ReactNode } from 'react';
+import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
@@ -12,17 +12,10 @@ interface ModalProps {
   children: ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   destroyOnClose?: boolean;
+  /** Elevación del overlay (por defecto 50). Permite apilar modales
+   *  de forma determinista sin depender del orden de los portales. */
+  zIndex?: number;
 }
-
-const getOrCreatePortalContainer = (): HTMLElement => {
-  let root = document.getElementById('agro-modal-root');
-  if (!root) {
-    root = document.createElement('div');
-    root.id = 'agro-modal-root';
-    document.body.appendChild(root);
-  }
-  return root;
-};
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -32,16 +25,33 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'lg',
   destroyOnClose = true,
+  zIndex = 50,
 }) => {
   const location = useLocation();
+  const instanceId = useId().replace(/:/g, '');
+  const containerRef = useRef<HTMLElement | null>(null);
   const [container, setContainer] = useState<HTMLElement | null>(null);
   // Smooth open/close: keeps the modal mounted while the exit transition plays
   const [shouldRender, setShouldRender] = useState(isOpen);
   const [visible, setVisible] = useState(false);
 
+  // Contenedor portal PROPIO de cada instancia del modal.
+  // Evita que modales apilados compartan el mismo nodo padre en el DOM: al
+  // desmontarse uno, React nunca puede confundir nodos hermanos (error típico
+  // "Failed to execute 'removeChild' on 'Node'").
   useEffect(() => {
-    setContainer(getOrCreatePortalContainer());
-  }, []);
+    const el = document.createElement('div');
+    el.id = `agro-modal-root-${instanceId}`;
+    document.body.appendChild(el);
+    containerRef.current = el;
+    setContainer(el);
+    return () => {
+      containerRef.current = null;
+      if (el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+    };
+  }, [instanceId]);
 
   // Open/Close transition orchestration
   useEffect(() => {
@@ -105,9 +115,10 @@ export const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
-      className={`fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs transition-opacity duration-200 ${
-        visible ? 'opacity-100' : 'opacity-0'
+      className={`fixed inset-0 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs transition-opacity duration-200 ${
+        visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
+      style={{ zIndex }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();

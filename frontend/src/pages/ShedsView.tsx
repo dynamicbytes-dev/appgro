@@ -763,7 +763,7 @@ export const ShedsView: React.FC = () => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-4 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full pl-10 pr-4 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
@@ -778,7 +778,7 @@ export const ShedsView: React.FC = () => {
                   setSelectedRootFarmId(normalized);
                   setCurrentPage(1);
                 }}
-                className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E] font-medium"
+                className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] font-medium text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               >
                 <option value="">Todas las Granjas</option>
                 {farmsList.map((farm) => (
@@ -798,7 +798,7 @@ export const ShedsView: React.FC = () => {
                 setSpeciesFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="all">Todas las Especies</option>
               {activeSpeciesList.map((sp) => (
@@ -817,7 +817,7 @@ export const ShedsView: React.FC = () => {
                 setStatusFilter(e.target.value as any);
                 setCurrentPage(1);
               }}
-              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="all">Todos los Estados</option>
               <option value="active">Activos</option>
@@ -1084,7 +1084,7 @@ export const ShedsView: React.FC = () => {
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
               required
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
             <p className="text-[10px] text-gray-400 mt-1">
               Identificador único de la nave o instalación física dentro de la granja.
@@ -1101,7 +1101,7 @@ export const ShedsView: React.FC = () => {
               onChange={(e) => handleSpeciesChange(e.target.value)}
               required
               disabled={isLoadingSpecies}
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="" disabled>
                 {isLoadingSpecies
@@ -1135,7 +1135,7 @@ export const ShedsView: React.FC = () => {
                 readOnly
                 value={formSector ? formSector.toUpperCase() : 'SELECCIONA UNA ESPECIE ARRIBA'}
                 placeholder="Autocompletado según la especie..."
-                className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold text-[#1B4D3E] dark:text-[#4E9F3D] cursor-not-allowed select-none"
+                className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold cursor-not-allowed select-none text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
               />
               <Tag className="w-4 h-4 absolute right-3.5 top-2.5 text-gray-400" />
             </div>
@@ -1155,7 +1155,7 @@ export const ShedsView: React.FC = () => {
               onChange={(e) => setFormPurpose(e.target.value)}
               required
               disabled={allowedPurposes.length === 0}
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="" disabled>
                 {formSector ? 'Selecciona el propósito...' : 'Primero selecciona una especie...'}
@@ -1188,7 +1188,7 @@ export const ShedsView: React.FC = () => {
               value={formMaxCapacity}
               onChange={(e) => setFormMaxCapacity(e.target.value)}
               required
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
             <p className="text-[10px] text-gray-400 mt-1">
               Límite de ocupación física para validación de densidad animal y asignación de lotes.
@@ -1208,7 +1208,7 @@ export const ShedsView: React.FC = () => {
                   loadActiveSpecies(e.target.value);
                 }}
                 required
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               >
                 <option value="">Selecciona una granja...</option>
                 {farmsList.map((f) => (
@@ -1278,7 +1278,7 @@ export const ShedsView: React.FC = () => {
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
               required
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
@@ -1290,7 +1290,7 @@ export const ShedsView: React.FC = () => {
               value={formSpeciesId}
               onChange={(e) => handleSpeciesChange(e.target.value)}
               required
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="" disabled>
                 Selecciona una especie...
@@ -1321,7 +1321,7 @@ export const ShedsView: React.FC = () => {
               type="text"
               readOnly
               value={formSector ? formSector.toUpperCase() : ''}
-              className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold text-[#1B4D3E] dark:text-[#4E9F3D] cursor-not-allowed"
+              className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold cursor-not-allowed text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
@@ -1335,7 +1335,7 @@ export const ShedsView: React.FC = () => {
               onChange={(e) => setFormPurpose(e.target.value)}
               required
               disabled={allowedPurposes.length === 0 && !formPurpose}
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="" disabled>
                 {formSector ? 'Selecciona el propósito...' : 'Primero selecciona una especie...'}
@@ -1370,7 +1370,7 @@ export const ShedsView: React.FC = () => {
               value={formMaxCapacity}
               onChange={(e) => setFormMaxCapacity(e.target.value)}
               required
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 

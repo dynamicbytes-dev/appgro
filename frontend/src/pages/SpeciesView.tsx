@@ -378,7 +378,7 @@ export const SpeciesView: React.FC = () => {
             value={currentCat ? currentCat.value : formCategory}
             onChange={(e) => handleCategoryChange(e.target.value)}
             required
-            className={`${selectBase} ${okBorder}`}
+            className={`${selectBase} ${okBorder} text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500`}
           >
             <option value="" disabled>
               Selecciona el sector pecuario oficial...
@@ -410,7 +410,7 @@ export const SpeciesView: React.FC = () => {
             onChange={(e) => handleAnimalSelect(e.target.value)}
             disabled={!formCategory}
             required={!isCustomName}
-            className={`${selectBase} ${formNameError && !isCustomName ? errBorder : okBorder}`}
+            className={`${selectBase} ${formNameError && !isCustomName ? errBorder : okBorder} text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500`}
           >
             <option value="" disabled>
               {formCategory ? 'Selecciona el tipo de animal...' : 'Primero selecciona un sector...'}
@@ -456,9 +456,7 @@ export const SpeciesView: React.FC = () => {
                 );
               }}
               required
-              className={`mt-2 w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 transition-colors ${
-                formNameError ? errBorder : okBorder
-              }`}
+              className={`mt-2 w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] rounded-xl text-xs transition-colors ${ formNameError ? errBorder : okBorder } text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500`}
             />
           )}
 
@@ -849,7 +847,7 @@ export const SpeciesView: React.FC = () => {
                 setSearchTerm(e.target.value);
                 setCurrentPage(1);
               }}
-              className="w-full pl-10 pr-4 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full pl-10 pr-4 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
@@ -863,7 +861,7 @@ export const SpeciesView: React.FC = () => {
                   setCategoryFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-300 focus:ring-2 focus:ring-[#1B4D3E]"
+                className="px-3 py-1.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               >
                 <option value="all">Todos los sectores</option>
                 {OFFICIAL_CATEGORIES.map((cat) => (
@@ -883,7 +881,7 @@ export const SpeciesView: React.FC = () => {
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-3 py-1.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-300 focus:ring-2 focus:ring-[#1B4D3E]"
+                className="px-3 py-1.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               >
                 <option value="all">Todos los estados</option>
                 <option value="active">Activas</option>
@@ -901,7 +899,7 @@ export const SpeciesView: React.FC = () => {
                     setSelectedRootFarmId(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="px-3 py-1.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-300 focus:ring-2 focus:ring-[#1B4D3E]"
+                  className="px-3 py-1.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 >
                   <option value="all">Todas las granjas</option>
                   {farmsList.map((f) => (
@@ -1141,7 +1139,7 @@ export const SpeciesView: React.FC = () => {
                 value={formFarmId}
                 onChange={(e) => setFormFarmId(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs text-[#1E1E1E] dark:text-gray-200 focus:ring-2 focus:ring-[#1B4D3E]"
+                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               >
                 <option value="">Selecciona una granja...</option>
                 {farmsList.map((f) => (

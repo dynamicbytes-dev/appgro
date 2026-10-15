@@ -48,10 +48,12 @@ export const normalizeIsActive = (val: unknown): boolean => {
 
   if (typeof val === 'string') {
     const s = val.trim().toLowerCase();
-    if (s === 'true' || s === 'active' || s === 'activo' || s === 'activa' || s === 'enabled' || s === 'habilitado' || s === 'habilitada' || s === 'verificado') {
+    if (s === 'true' || s === 'active' || s === 'activo' || s === 'activa' || s === 'enabled' || s === 'habilitado' || s === 'habilitada' || s === 'verificado' || s === 'gestación' || s === 'gestacion' || s === 'destete') {
       return true;
     }
-    if (s === 'false' || s === 'inactive' || s === 'inactivo' || s === 'inactiva' || s === 'disabled' || s === 'inhabilitado' || s === 'inhabilitada' || s === 'en proceso' || s === 'pendiente') {
+    if (s === 'false' || s === 'inactive' || s === 'inactivo' || s === 'inactiva' || s === 'disabled' || s === 'inhabilitado' || s === 'inhabilitada' || s === 'en proceso' || s === 'pendiente'
+      // Estados de animales individuales fuera de producción (módulo Lotes)
+      || s === 'cosechado' || s === 'vendido' || s === 'descartado' || s === 'muerto') {
       return false;
     }
   }

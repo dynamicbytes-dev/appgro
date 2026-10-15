@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* El tema de la app se alterna con la clase `.dark` en <html> (AuthContext),
+   por eso los dark: de Tailwind deben seguir la clase y no el media query. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
     --color-agro-primary: #1B4D3E;
@@ -78,4 +82,22 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(27, 77, 62, 0.4);
+}
+
+/* Legibilidad de campos de formulario: input, select y textarea nunca
+   heredan tonos claros; el texto escrito y los placeholders son legibles
+   en ambos temas (red de seguridad global para campos sin clase explícita).
+   Las utilidades Tailwind (capa utilities) siguen ganando por encima de base. */
+@layer base {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='hidden']),
+  select,
+  textarea {
+    color: var(--color-agro-text);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-agro-muted);
+    opacity: 1;
+  }
 }

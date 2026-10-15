@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Galpon;
+use App\Models\Lot;
 use App\Models\Species;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,17 +12,16 @@ use Symfony\Component\HttpFoundation\Response;
 
 class GalponController extends Controller
 {
-
     private const PURPOSES_BY_CATEGORY = [
-        'avícola'  => [
+        'avícola' => [
             'carne',
             'Carne',
             'CARNE',
             'huevos',
             'Huevos',
-            'HUEVOS'
+            'HUEVOS',
         ],
-        'porcina'  => [
+        'porcina' => [
             'carne',
             'Carne',
             'CARNE',
@@ -30,7 +30,7 @@ class GalponController extends Controller
             'Reproducción',
             'Reproduccion',
             'REPRODUCCIÓN',
-            'REPRODUCCION'
+            'REPRODUCCION',
         ],
         'cunícula' => [
             'carne',
@@ -41,9 +41,9 @@ class GalponController extends Controller
             'Reproducción',
             'Reproduccion',
             'REPRODUCCIÓN',
-            'REPRODUCCION'
+            'REPRODUCCION',
         ],
-        'bovina'   => [
+        'bovina' => [
             'carne',
             'Carne',
             'CARNE',
@@ -55,9 +55,9 @@ class GalponController extends Controller
             'REPRODUCCION',
             'leche',
             'Leche',
-            'LECHE'
+            'LECHE',
         ],
-        'ovina'    => [
+        'ovina' => [
             'carne',
             'Carne',
             'CARNE',
@@ -72,9 +72,9 @@ class GalponController extends Controller
             'REPRODUCCION',
             'lana',
             'Lana',
-            'LANA'
+            'LANA',
         ],
-        'caprina'  => [
+        'caprina' => [
             'carne',
             'Carne',
             'CARNE',
@@ -89,10 +89,9 @@ class GalponController extends Controller
             'REPRODUCCION',
             'fibra',
             'Fibra',
-            'FIBRA'
+            'FIBRA',
         ],
     ];
-    
 
     private function isPurposeAllowedForSpecies(string $purpose, Species $species): bool
     {
@@ -109,7 +108,7 @@ class GalponController extends Controller
     {
         $user = Auth::guard('api')->user() ?? Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no autenticado.',
@@ -125,7 +124,7 @@ class GalponController extends Controller
         if ($request->filled('farm_id') && $request->farm_id !== 'all' && strtolower(trim((string) $request->farm_id)) !== 'all') {
             $query->where('farm_id', (int) $request->farm_id);
         } elseif ($user->role !== 'root') {
-            if (!$user->farm_id) {
+            if (! $user->farm_id) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Usuario sin granja asignada.',
@@ -170,7 +169,7 @@ class GalponController extends Controller
 
         // Search text in name or purpose
         if ($request->filled('search')) {
-            $term = '%' . trim($request->search) . '%';
+            $term = '%'.trim($request->search).'%';
             $query->where(function ($q) use ($term) {
                 $q->where('name', 'like', $term)
                     ->orWhere('purpose', 'like', $term)
@@ -180,6 +179,35 @@ class GalponController extends Controller
         }
 
         $galpones = $query->orderBy('name', 'asc')->get();
+
+        // Ocupación/available por galpón: suma de la ocupación
+        // actual de cada lote activo (animales activos + en
+        // gestación + destetados). Un animal en gestación sigue
+        // ocupando su lugar en el galpón; los lotes sin
+        // seguimiento individual (ej. engorde) aportan su
+        // cantidad declarada.
+        $activeLots = Lot::query()
+            ->where('status', 'activo')
+            ->whereNotNull('galpon_id')
+            ->when($user->role !== 'root' && $user->farm_id, function ($q) use ($user) {
+                $q->where('farm_id', $user->farm_id);
+            })
+            ->get(['id', 'galpon_id', 'quantity']);
+
+        Lot::loadCurrentOccupancy($activeLots);
+
+        $occupiedByBarn = [];
+        foreach ($activeLots as $lot) {
+            $galponId = (int) $lot->galpon_id;
+            $occupiedByBarn[$galponId] = ($occupiedByBarn[$galponId] ?? 0) + (int) $lot->current_occupancy;
+        }
+
+        $galpones->each(function ($galpon) use ($occupiedByBarn) {
+            $occupied = (int) ($occupiedByBarn[$galpon->id] ?? 0);
+            $galpon->occupied_capacity = $occupied;
+            $galpon->available_capacity = max(0, (int) $galpon->max_capacity - $occupied);
+        });
+
         $stats = $this->computeGalponStats($request, $user);
 
         return response()->json([
@@ -207,14 +235,14 @@ class GalponController extends Controller
     {
         $user = Auth::guard('api')->user() ?? Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no autenticado.',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        if (!$user->isRoot() && !$user->farm_id) {
+        if (! $user->isRoot() && ! $user->farm_id) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario sin granja asignada.',
@@ -254,7 +282,7 @@ class GalponController extends Controller
         if ($hasSpecificFarm) {
             $baseQuery->where('farm_id', (int) $request->farm_id);
         } elseif ($user->role !== 'root') {
-            if (!$user->farm_id) {
+            if (! $user->farm_id) {
                 return [
                     'total_galpones' => 0,
                     'active_galpones' => 0,
@@ -314,7 +342,7 @@ class GalponController extends Controller
     {
         $user = Auth::guard('api')->user() ?? Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no autenticado.',
@@ -349,7 +377,7 @@ class GalponController extends Controller
         // Resolve target farm_id
         if ($user->isRoot()) {
             $farmId = $request->input('farm_id') ?: $request->input('farmId');
-            if (!$farmId) {
+            if (! $farmId) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Debe especificar el ID de la granja (farm_id) para registrar el galpón.',
@@ -363,7 +391,7 @@ class GalponController extends Controller
         // Must belong to the same farm and be active!
         $species = Species::find($request->species_id);
 
-        if (!$species || (int) $species->farm_id !== (int) $farmId) {
+        if (! $species || (int) $species->farm_id !== (int) $farmId) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'La especie seleccionada no pertenece a esta granja.',
@@ -373,7 +401,7 @@ class GalponController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if (!$species->is_active) {
+        if (! $species->is_active) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'La especie seleccionada se encuentra inactiva.',
@@ -383,7 +411,7 @@ class GalponController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if (!$this->isPurposeAllowedForSpecies($request->purpose, $species)) {
+        if (! $this->isPurposeAllowedForSpecies($request->purpose, $species)) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Error de validación de datos.',
@@ -429,7 +457,7 @@ class GalponController extends Controller
             'lots',
         ])->find($id);
 
-        if (!$galpon) {
+        if (! $galpon) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Galpón no encontrado o sin acceso.',
@@ -437,7 +465,7 @@ class GalponController extends Controller
         }
 
         // Strict farm boundary check for non-root users
-        if ($user && !$user->isRoot() && $galpon->farm_id !== $user->farm_id) {
+        if ($user && ! $user->isRoot() && $galpon->farm_id !== $user->farm_id) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Acceso denegado: Este galpón pertenece a otra granja.',
@@ -459,7 +487,7 @@ class GalponController extends Controller
 
         $galpon = Galpon::withoutGlobalScopes()->find($id);
 
-        if (!$galpon) {
+        if (! $galpon) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Galpón no encontrado o sin acceso.',
@@ -467,7 +495,7 @@ class GalponController extends Controller
         }
 
         // Strict boundary check
-        if ($user && !$user->isRoot() && $galpon->farm_id !== $user->farm_id) {
+        if ($user && ! $user->isRoot() && $galpon->farm_id !== $user->farm_id) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Acceso denegado: Este galpón pertenece a otra granja.',
@@ -500,7 +528,7 @@ class GalponController extends Controller
         if ($request->has('species_id')) {
             $species = Species::find($request->species_id);
 
-            if (!$species || (int) $species->farm_id !== (int) $galpon->farm_id) {
+            if (! $species || (int) $species->farm_id !== (int) $galpon->farm_id) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'La especie seleccionada no pertenece a esta granja.',
@@ -510,7 +538,7 @@ class GalponController extends Controller
                 ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
-            if (!$species->is_active) {
+            if (! $species->is_active) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'La especie seleccionada se encuentra inactiva.',
@@ -528,7 +556,7 @@ class GalponController extends Controller
         if ($request->has('purpose')) {
             $purposeSpecies = $species ?? Species::find($galpon->species_id);
 
-            if (!$purposeSpecies || !$this->isPurposeAllowedForSpecies($request->purpose, $purposeSpecies)) {
+            if (! $purposeSpecies || ! $this->isPurposeAllowedForSpecies($request->purpose, $purposeSpecies)) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Error de validación de datos.',
@@ -571,14 +599,14 @@ class GalponController extends Controller
 
         $galpon = Galpon::withoutGlobalScopes()->find($id);
 
-        if (!$galpon) {
+        if (! $galpon) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Galpón no encontrado o sin acceso.',
             ], Response::HTTP_NOT_FOUND);
         }
 
-        if ($user && !$user->isRoot() && $galpon->farm_id !== $user->farm_id) {
+        if ($user && ! $user->isRoot() && $galpon->farm_id !== $user->farm_id) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Acceso denegado: Este galpón pertenece a otra granja.',
@@ -587,7 +615,7 @@ class GalponController extends Controller
 
         $newStatus = $request->has('is_active')
             ? (bool) $request->is_active
-            : !$galpon->is_active;
+            : ! $galpon->is_active;
 
         $galpon->is_active = $newStatus;
         $galpon->save();
@@ -609,7 +637,7 @@ class GalponController extends Controller
 
         $galpon = Galpon::withoutGlobalScopes()->find($id);
 
-        if (!$galpon) {
+        if (! $galpon) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Galpón no encontrado o sin acceso.',
@@ -617,7 +645,7 @@ class GalponController extends Controller
         }
 
         // Strict farm boundary: non-root users may only delete their own farm's galpones
-        if ($user && !$user->isRoot() && $galpon->farm_id !== $user->farm_id) {
+        if ($user && ! $user->isRoot() && $galpon->farm_id !== $user->farm_id) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Acceso denegado: Este galpón pertenece a otra granja.',

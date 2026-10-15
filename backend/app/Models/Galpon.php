@@ -62,6 +62,6 @@ class Galpon extends Model
      */
     public function lots()
     {
-        return $this->hasMany(Lot::class, 'barn_id');
+        return $this->hasMany(Lot::class, 'galpon_id');
     }
 }

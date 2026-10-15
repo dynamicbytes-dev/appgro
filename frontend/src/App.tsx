@@ -15,6 +15,7 @@ import { AdminSubordinatesView } from './pages/admin/AdminSubordinatesView';
 import { HistoryView } from './pages/HistoryView';
 import { SpeciesView } from './pages/SpeciesView';
 import { GalponesView } from './pages/GalponesView';
+import { LotesView } from './pages/LotesView';
 import { ModulePage } from './pages/ModulePage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -88,6 +89,26 @@ export const App: React.FC = () => {
                     element={
                       <ModuleGuard moduleCode="galpones">
                         <GalponesView />
+                      </ModuleGuard>
+                    }
+                  />
+
+                  {/* Lotes Module Dedicated Routes */}
+                  <Route path="/lotes" element={<LotesView />} />
+                  <Route path="/lots" element={<LotesView />} />
+                  <Route
+                    path="/modules/lotes"
+                    element={
+                      <ModuleGuard moduleCode="lotes">
+                        <LotesView />
+                      </ModuleGuard>
+                    }
+                  />
+                  <Route
+                    path="/modules/lots"
+                    element={
+                      <ModuleGuard>
+                        <LotesView />
                       </ModuleGuard>
                     }
                   />

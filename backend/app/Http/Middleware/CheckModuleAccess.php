@@ -15,14 +15,13 @@ class CheckModuleAccess
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     * @param  string  $moduleCode
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next, string $moduleCode): Response
     {
         $user = Auth::user();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'No autenticado.',
@@ -35,7 +34,7 @@ class CheckModuleAccess
         }
 
         // Validate user belongs to an active farm
-        if (!$user->farm_id) {
+        if (! $user->farm_id) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Usuario no tiene una granja asignada.',
@@ -43,19 +42,20 @@ class CheckModuleAccess
         }
 
         $farm = Farm::find($user->farm_id);
-        if (!$farm || !$farm->is_active) {
+        if (! $farm || ! $farm->is_active) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'La granja del usuario se encuentra inactiva o deshabilitada.',
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Find requested module (supporting galpones/barns alias)
+        // Find requested module (supporting galpones/barns and lots/lotes aliases)
         $module = Module::where('code', $moduleCode)->first();
-        if (!$module) {
+        if (! $module) {
             $alias = match ($moduleCode) {
                 'galpones' => 'barns',
                 'barns' => 'galpones',
+                'lotes' => 'lots',
                 'history' => 'historial',
                 'historial' => 'history',
                 default => null,
@@ -65,7 +65,7 @@ class CheckModuleAccess
             }
         }
 
-        if (!$module) {
+        if (! $module) {
             return response()->json([
                 'status' => 'error',
                 'message' => "El módulo '{$moduleCode}' no existe en el sistema.",
@@ -77,6 +77,10 @@ class CheckModuleAccess
             $equiv = Module::whereIn('code', ['galpones', 'barns'])->pluck('id')->toArray();
             $equivalentModuleIds = array_unique(array_merge($equivalentModuleIds, $equiv));
         }
+        if (in_array($module->code, ['lots', 'lotes'])) {
+            $equiv = Module::whereIn('code', ['lots', 'lotes'])->pluck('id')->toArray();
+            $equivalentModuleIds = array_unique(array_merge($equivalentModuleIds, $equiv));
+        }
 
         // b) Admin Role: Check farm_modules
         if ($user->isAdmin()) {
@@ -86,7 +90,7 @@ class CheckModuleAccess
                 ->where('is_enabled', true)
                 ->exists();
 
-            if (!$farmModuleEnabled) {
+            if (! $farmModuleEnabled) {
                 return response()->json([
                     'status' => 'error',
                     'message' => "Acceso denegado: El módulo '{$moduleCode}' no está habilitado para su granja.",
@@ -104,7 +108,7 @@ class CheckModuleAccess
                 ->where('is_enabled', true)
                 ->exists();
 
-            if (!$farmModuleEnabled) {
+            if (! $farmModuleEnabled) {
                 return response()->json([
                     'status' => 'error',
                     'message' => "Acceso denegado: El módulo '{$moduleCode}' no está habilitado en su granja.",
@@ -117,7 +121,7 @@ class CheckModuleAccess
                 ->where('is_enabled', true)
                 ->exists();
 
-            if (!$subordinateModuleEnabled) {
+            if (! $subordinateModuleEnabled) {
                 return response()->json([
                     'status' => 'error',
                     'message' => "Acceso denegado: No tiene asignados permisos para el módulo '{$moduleCode}'.",

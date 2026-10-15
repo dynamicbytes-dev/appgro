@@ -11,7 +11,6 @@ use App\Models\Module;
 use App\Models\Species;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -87,7 +86,7 @@ class GalponesModuleTest extends TestCase
         ]);
         $token = $login->json('data.access_token');
 
-        $response = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/galpones');
 
         $response->assertStatus(403)
@@ -134,7 +133,7 @@ class GalponesModuleTest extends TestCase
         ]);
         $token = $login->json('data.access_token');
 
-        $createRes = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $createRes = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/galpones', [
                 'name' => 'Galpón 1 - Engorde Intensivo',
                 'species_id' => $species->id,
@@ -175,7 +174,7 @@ class GalponesModuleTest extends TestCase
             ->first();
         $this->assertNotNull($auditLog);
 
-        $this->withHeader('Authorization', 'Bearer ' . $token)
+        $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/galpones', [
                 'name' => 'Galpón con propósito inválido',
                 'species_id' => $species->id,
@@ -185,8 +184,8 @@ class GalponesModuleTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors(['purpose']);
 
-        $this->withHeader('Authorization', 'Bearer ' . $token)
-            ->patchJson('/api/v1/galpones/' . $galponId, [
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->patchJson('/api/v1/galpones/'.$galponId, [
                 'purpose' => 'huevos',
             ])
             ->assertStatus(422)
@@ -226,7 +225,7 @@ class GalponesModuleTest extends TestCase
         ]);
         $token = $login->json('data.access_token');
 
-        $res = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $res = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/galpones', [
                 'name' => 'Galpón Con Especie Ajena',
                 'species_id' => $speciesFarm2->id,
@@ -271,7 +270,7 @@ class GalponesModuleTest extends TestCase
         ]);
         $token = $login->json('data.access_token');
 
-        $res = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $res = $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/galpones', [
                 'name' => 'Galpón Inactivo',
                 'species_id' => $inactiveSpecies->id,
@@ -338,7 +337,7 @@ class GalponesModuleTest extends TestCase
         $token = $login->json('data.access_token');
 
         // 1. Index only returns farm 1 galpones
-        $indexRes = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $indexRes = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/galpones')
             ->assertStatus(200);
 
@@ -347,17 +346,17 @@ class GalponesModuleTest extends TestCase
         $this->assertEquals($g1->id, $data[0]['id']);
 
         // 2. Cannot view farm 2 galpon -> 403 Forbidden
-        $this->withHeader('Authorization', 'Bearer ' . $token)
+        $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson("/api/v1/galpones/{$g2->id}")
             ->assertStatus(403);
 
         // 3. Cannot update farm 2 galpon -> 403 Forbidden
-        $this->withHeader('Authorization', 'Bearer ' . $token)
+        $this->withHeader('Authorization', 'Bearer '.$token)
             ->putJson("/api/v1/galpones/{$g2->id}", ['name' => 'Hack Name'])
             ->assertStatus(403);
 
         // 4. Cannot delete farm 2 galpon -> 403 Forbidden
-        $this->withHeader('Authorization', 'Bearer ' . $token)
+        $this->withHeader('Authorization', 'Bearer '.$token)
             ->deleteJson("/api/v1/galpones/{$g2->id}")
             ->assertStatus(403);
     }
@@ -382,14 +381,14 @@ class GalponesModuleTest extends TestCase
         $token = $login->json('data.access_token');
 
         // Global list sees 2 galpones
-        $resGlobal = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $resGlobal = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/galpones')
             ->assertStatus(200);
 
         $this->assertCount(2, $resGlobal->json('data'));
 
         // Filter by farm 1
-        $resF1 = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $resF1 = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson("/api/v1/galpones?farm_id={$farm1->id}")
             ->assertStatus(200);
 
@@ -426,7 +425,7 @@ class GalponesModuleTest extends TestCase
         ]);
         $token = $login->json('data.access_token');
 
-        $res = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $res = $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/galpones/stats')
             ->assertStatus(200);
 
@@ -476,7 +475,7 @@ class GalponesModuleTest extends TestCase
         $token = $login->json('data.access_token');
 
         // Toggle to false
-        $res = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $res = $this->withHeader('Authorization', 'Bearer '.$token)
             ->patchJson("/api/v1/galpones/{$galpon->id}/toggle-status")
             ->assertStatus(200);
 
@@ -484,7 +483,7 @@ class GalponesModuleTest extends TestCase
         $this->assertDatabaseHas('galpones', ['id' => $galpon->id, 'is_active' => false]);
 
         // Toggle back to true
-        $res2 = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $res2 = $this->withHeader('Authorization', 'Bearer '.$token)
             ->patchJson("/api/v1/galpones/{$galpon->id}/toggle-status")
             ->assertStatus(200);
 
@@ -541,14 +540,14 @@ class GalponesModuleTest extends TestCase
         $rootToken = $rootLogin->json('data.access_token');
 
         // Root requests with farm_id=all
-        $resRootAll = $this->withHeader('Authorization', 'Bearer ' . $rootToken)
+        $resRootAll = $this->withHeader('Authorization', 'Bearer '.$rootToken)
             ->getJson('/api/v1/galpones?farm_id=all')
             ->assertStatus(200);
 
         $this->assertCount(2, $resRootAll->json('data'));
 
         // Root stats with farm_id=all
-        $resRootStats = $this->withHeader('Authorization', 'Bearer ' . $rootToken)
+        $resRootStats = $this->withHeader('Authorization', 'Bearer '.$rootToken)
             ->getJson('/api/v1/galpones/stats?farm_id=all')
             ->assertStatus(200);
         $this->assertEquals(2, $resRootStats->json('total_galpones'));
@@ -561,7 +560,7 @@ class GalponesModuleTest extends TestCase
         $adminToken = $adminLogin->json('data.access_token');
 
         // Admin requests with farm_id=all - must be safely scoped to farmA only
-        $resAdminAll = $this->withHeader('Authorization', 'Bearer ' . $adminToken)
+        $resAdminAll = $this->withHeader('Authorization', 'Bearer '.$adminToken)
             ->getJson('/api/v1/galpones?farm_id=all')
             ->assertStatus(200);
 
@@ -569,7 +568,7 @@ class GalponesModuleTest extends TestCase
         $this->assertEquals('Galpón Alfa', $resAdminAll->json('data.0.name'));
 
         // Admin stats with farm_id=all
-        $resAdminStats = $this->withHeader('Authorization', 'Bearer ' . $adminToken)
+        $resAdminStats = $this->withHeader('Authorization', 'Bearer '.$adminToken)
             ->getJson('/api/v1/galpones/stats?farm_id=all')
             ->assertStatus(200);
         $this->assertEquals(1, $resAdminStats->json('total_galpones'));
@@ -622,23 +621,20 @@ class GalponesModuleTest extends TestCase
             'is_active' => true,
         ]);
 
-        // Legacy barn row sharing the same ID: lots.barn_id is FK-constrained
-        // to the barns table and Galpon::lots() maps onto barn_id
-        DB::table('barns')->insert([
-            'id' => $galpon->id,
-            'farm_id' => $farm->id,
-            'name' => $galpon->name,
-            'created_at' => now(),
-        ]);
-
         // Operational lot lodged in the barn
         Lot::create([
             'farm_id' => $farm->id,
-            'barn_id' => $galpon->id,
-            'name' => 'Lote 1 - Engorde',
+            'galpon_id' => $galpon->id,
+            'code' => 'LOT-00001',
+            'species_id' => $sp->id,
+            'sector' => 'bovina',
+            'purpose' => 'carne',
+            'quantity' => 50,
+            'status' => 'activo',
+            'entry_date' => now()->toDateString(),
         ]);
 
-        $res = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $res = $this->withHeader('Authorization', 'Bearer '.$token)
             ->deleteJson("/api/v1/galpones/{$galpon->id}");
 
         $res->assertStatus(422)
@@ -649,7 +645,7 @@ class GalponesModuleTest extends TestCase
 
         // Galpón and its lot remain intact
         $this->assertDatabaseHas('galpones', ['id' => $galpon->id]);
-        $this->assertDatabaseHas('lots', ['barn_id' => $galpon->id]);
+        $this->assertDatabaseHas('lots', ['galpon_id' => $galpon->id]);
     }
 
     public function test_can_delete_galpon_without_operational_dependencies(): void
@@ -699,7 +695,7 @@ class GalponesModuleTest extends TestCase
             'is_active' => true,
         ]);
 
-        $res = $this->withHeader('Authorization', 'Bearer ' . $token)
+        $res = $this->withHeader('Authorization', 'Bearer '.$token)
             ->deleteJson("/api/v1/galpones/{$galpon->id}");
 
         $res->assertStatus(200)

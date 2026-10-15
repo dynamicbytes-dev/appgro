@@ -330,7 +330,7 @@ export const RootDashboard: React.FC = () => {
               placeholder="Ej: Granja Agropecuaria La Esperanza"
               value={newFarmName}
               onChange={(e) => setNewFarmName(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E]"
+              className="w-full px-3 py-2 bg-gray-50 dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             />
           </div>
 
