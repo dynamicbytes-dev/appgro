@@ -60,8 +60,10 @@ const normalizeKey = (raw?: string | null): string =>
     .trim()
     .toLowerCase();
 
-const isEggPurpose = (purpose?: string | null): boolean =>
-  normalizeKey(purpose) === 'huevos';
+const isEggPurpose = (purpose?: string | null): boolean => {
+  const key = normalizeKey(purpose);
+  return key === 'huevos' || key === 'postura';
+};
 
 const isReproductionPurpose = (purpose?: string | null): boolean =>
   normalizeKey(purpose) === 'reproduccion';
@@ -73,6 +75,10 @@ const isGestatingAnimal = (status?: string | null): boolean =>
 
 const isPorcinoSector = (sector?: string | null): boolean =>
   normalizeKey(sector).startsWith('porcin');
+
+// Sector avícola (aves): avícola, avicola, avicultura...
+const isAvicolaSector = (sector?: string | null): boolean =>
+  normalizeKey(sector).startsWith('avicol');
 
 const ANIMAL_STATUS_LABELS: Record<string, string> = {
   activo: 'Activo',
@@ -552,12 +558,16 @@ export const LotesView: React.FC = () => {
     }
   }, [currentPage, filteredLots.length, paginatedLots.length]);
 
-  // Cupo ocupado por galpón, derivado de los lotes visibles
-  // (animales activos + en gestación). Se recalcula al
+  // Cupo ocupado por galpón, derivado de los lotes **activos**
+  // (animales activos + en gestación + destetados). Coincide con
+  // el backend (GalponController@index), que solo suma lotes
+  // activos. Los lotes inactivos (cosechados/vendidos) ya no
+  // ocupan cupo y por eso NO se incluyen. Se recalcula al
   // instante tras cualquier cambio en la tabla principal.
   const occupiedByBarnId = useMemo(() => {
     const map = new Map<string, number>();
     lotsList.forEach((l) => {
+      if (l.status !== 'activo') return;
       const key = String(l.galpon_id ?? '');
       if (!key || key === 'null' || key === 'undefined') return;
       const occ = Number(l.current_occupancy ?? l.quantity ?? 0);
@@ -810,16 +820,21 @@ export const LotesView: React.FC = () => {
   const handleHarvestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLot) return;
-    const w = parseFloat(harvestAvgWeight);
-    const p = parseFloat(harvestPricePerKg);
+    const eggLot = isEggPurpose(selectedLot.purpose);
+    // En lotes de postura (huevos) el peso y el precio son opcionales
+    // (las aves se retiran al fin del ciclo sin peso de venta).
+    const w = eggLot ? (parseFloat(harvestAvgWeight) || 0) : parseFloat(harvestAvgWeight);
+    const p = eggLot ? (parseFloat(harvestPricePerKg) || 0) : parseFloat(harvestPricePerKg);
     const q = parseInt(harvestQuantity, 10);
-    if (Number.isNaN(w) || w < 0) {
-      setErrorMessage('Ingrese el peso promedio por animal.');
-      return;
-    }
-    if (Number.isNaN(p) || p < 0) {
-      setErrorMessage('Ingrese el precio por kilo.');
-      return;
+    if (!eggLot) {
+      if (Number.isNaN(w) || w < 0) {
+        setErrorMessage('Ingrese el peso promedio por animal.');
+        return;
+      }
+      if (Number.isNaN(p) || p < 0) {
+        setErrorMessage('Ingrese el precio por kilo.');
+        return;
+      }
     }
     if (Number.isNaN(q) || q <= 0 || q > Number(selectedLot.quantity || 0)) {
       setErrorMessage(
@@ -877,9 +892,14 @@ export const LotesView: React.FC = () => {
     if (Number.isNaN(total) || Number.isNaN(price)) return null;
     const b = Number.isNaN(broken) ? 0 : broken;
     return {
+      // Total de Huevos = Completos + Rotos
+      total_eggs_all: total + b,
+      // Huevos Buenos (Completos): base del costo de producción
+      good_eggs: total,
+      // Costo de producción = Completos × precio
       total_egg_cost: total * price,
+      // Costo de mermas = Rotos × precio
       total_broken_cost: b * price,
-      good_eggs: Math.max(0, total - b),
     };
   }, [eggsTotal, eggsBroken, eggsPrice]);
 
@@ -1860,8 +1880,9 @@ export const LotesView: React.FC = () => {
                               <Edit2 className="w-4 h-4" />
                             </button>
 
-                            {/* Cosechar (carnes / general) */}
-                            {isActive && !isEggPurpose(lot.purpose) && (
+                            {/* Cosechar (fin de ciclo): aplica a carnes Y a
+                                lotes de postura (huevos) */}
+                            {isActive && (
                               <button
                                 type="button"
                                 onClick={() => openHarvestModal(lot)}
@@ -1872,12 +1893,13 @@ export const LotesView: React.FC = () => {
                               </button>
                             )}
 
-                            {/* Recoger huevos (avícola - huevos) */}
-                            {isActive && isEggPurpose(lot.purpose) && (
+                            {/* Recoger huevos: solo lotes del sector
+                                Avícola con propósito de postura/huevos */}
+                            {isActive && isAvicolaSector(lot.sector) && isEggPurpose(lot.purpose) && (
                               <button
                                 type="button"
                                 onClick={() => openEggsModal(lot)}
-                                title="Registrar producción de huevos"
+                                title="Recoger huevos"
                                 className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
                               >
                                 <Egg className="w-4 h-4" />
@@ -2687,16 +2709,28 @@ export const LotesView: React.FC = () => {
                     Producción de Huevos Acumulada
                   </span>
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <span>Huevos totales: <strong>{Number(selectedLot.total_eggs || 0).toLocaleString()}</strong></span>
-                    <span>Huevos rotos: <strong>{Number(selectedLot.broken_eggs || 0).toLocaleString()}</strong></span>
+                    <span>Total de huevos: <strong>{(Number(selectedLot.total_eggs || 0) + Number(selectedLot.broken_eggs || 0)).toLocaleString()}</strong></span>
+                    <span>Huevos buenos (completos): <strong>{Number(selectedLot.total_eggs || 0).toLocaleString()}</strong></span>
+                    <span>Huevos rotos (mermas): <strong>{Number(selectedLot.broken_eggs || 0).toLocaleString()}</strong></span>
                     <span>Precio unitario: <strong>{formatDecimal(selectedLot.egg_price)}</strong></span>
                     <span>Costo producción: <strong>{formatDecimal(selectedLot.total_egg_cost)}</strong></span>
                     <span>Costo mermas: <strong>{formatDecimal(selectedLot.total_broken_cost)}</strong></span>
-                    <span>Buenos: <strong>{Number(selectedLot.total_eggs || 0) - Number(selectedLot.broken_eggs || 0)}</strong></span>
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Costo Total de Cosecha (incluye producción de huevos) */}
+            {Number(selectedLot.harvest_cost || 0) > 0 && (
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-200/60 dark:border-emerald-800/40 flex items-center justify-between">
+                <span className="text-[10px] text-emerald-600 uppercase font-bold">
+                  Costo Total de Cosecha
+                </span>
+                <span className="font-black text-sm font-mono text-[#1B4D3E] dark:text-[#4E9F3D]">
+                  {formatDecimal(selectedLot.harvest_cost)}
+                </span>
+              </div>
+            )}
 
             {selectedLot.farm && (
               <div className="p-3 bg-emerald-50/50 dark:bg-[#121816] rounded-xl border border-emerald-200/60 dark:border-[#263632] flex items-center justify-between">
@@ -2815,7 +2849,7 @@ export const LotesView: React.FC = () => {
             {/* Peso promedio */}
             <div>
               <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
-                Peso Promedio (kg) <span className="text-red-500">*</span>
+                Peso Promedio (kg) {!isEggPurpose(selectedLot.purpose) && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
                 <input
@@ -2825,7 +2859,7 @@ export const LotesView: React.FC = () => {
                   placeholder="Ej. 120.50"
                   value={harvestAvgWeight}
                   onChange={(e) => setHarvestAvgWeight(e.target.value)}
-                  required
+                  required={!isEggPurpose(selectedLot.purpose)}
                   className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 />
                 <Weight className="w-4 h-4 absolute right-3.5 top-2.5 text-gray-400" />
@@ -2835,7 +2869,7 @@ export const LotesView: React.FC = () => {
             {/* Precio por kilo */}
             <div>
               <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
-                Precio por Kilo <span className="text-red-500">*</span>
+                Precio por Kilo {!isEggPurpose(selectedLot.purpose) && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
                 <input
@@ -2845,7 +2879,7 @@ export const LotesView: React.FC = () => {
                   placeholder="Ej. 3.25"
                   value={harvestPricePerKg}
                   onChange={(e) => setHarvestPricePerKg(e.target.value)}
-                  required
+                  required={!isEggPurpose(selectedLot.purpose)}
                   className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                 />
                 <DollarSign className="w-4 h-4 absolute right-3.5 top-2.5 text-gray-400" />
@@ -2961,7 +2995,7 @@ export const LotesView: React.FC = () => {
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 dark:text-gray-300">Costo de producción (totales × precio):</span>
+                <span className="text-gray-600 dark:text-gray-300">Costo de producción (completos × precio):</span>
                 <span className="font-black font-mono">{eggsTotals ? formatDecimal(eggsTotals.total_egg_cost) : '—'}</span>
               </div>
               <div className="flex items-center justify-between text-xs">

@@ -395,16 +395,6 @@ class LotesModuleTest extends TestCase
             ])
             ->assertStatus(422);
 
-        // Broken eggs cannot exceed total eggs
-        $this->withHeader('Authorization', 'Bearer '.$token)
-            ->postJson("/api/v1/lots/{$lotId}/eggs", [
-                'total_eggs' => 10,
-                'broken_eggs' => 11,
-                'egg_price' => 0.25,
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['broken_eggs']);
-
         // Egg registration only applies to egg-production lots
         $meatSpecies = Species::create([
             'farm_id' => $farm->id,
@@ -428,6 +418,120 @@ class LotesModuleTest extends TestCase
                 'egg_price' => 0.25,
             ])
             ->assertStatus(422);
+    }
+
+    /**
+     * Cosechar un lote de postura (huevos): libera el cupo del galpón
+     * y marca el lote como INACTIVO (fin de ciclo de postura), sin
+     * requerir peso ni precio de venta.
+     */
+    public function test_egg_lot_harvest_releases_capacity_and_inactivates(): void
+    {
+        [$farm, $admin, $token] = $this->createFarmWithAdmin('Granja Cosecha Huevos', 'admin_cosecha_huevos@test.com');
+
+        $species = $this->createSpecies($farm, 'avícola');
+        $galpon = $this->createGalpon($farm, $species, [
+            'category' => 'avícola',
+            'sector' => 'avícola',
+            'purpose' => 'huevos',
+            'max_capacity' => 100,
+        ]);
+
+        $auth = fn () => $this->withHeader('Authorization', 'Bearer '.$token);
+
+        $lotId = $auth()->postJson('/api/v1/lots', [
+            'galpon_id' => $galpon->id,
+            'species_id' => $species->id,
+            'quantity' => 50,
+        ])->assertStatus(201)->json('data.id');
+
+        // Registrar producción de huevos (NO libera cupo)
+        $auth()->postJson("/api/v1/lots/{$lotId}/eggs", [
+            'total_eggs' => 1000,
+            'broken_eggs' => 40,
+            'egg_price' => 0.25,
+        ])->assertStatus(200);
+
+        // Cosecha COMPLETA del lote de postura (sin peso ni precio)
+        $auth()->postJson("/api/v1/lots/{$lotId}/harvest", [
+            'quantity' => 50,
+        ])->assertStatus(200)
+            ->assertJsonPath('data.status', 'inactivo')
+            ->assertJsonPath('data.quantity', 0);
+
+        $this->assertDatabaseHas('lots', [
+            'id' => $lotId,
+            'status' => 'inactivo',
+            'quantity' => 0,
+        ]);
+
+        // Habilitar el módulo de galpones para leer la ocupación
+        $galponesModule = Module::where('code', 'galpones')->first();
+        FarmModule::where('farm_id', $farm->id)
+            ->where('module_id', $galponesModule->id)
+            ->update(['is_enabled' => true]);
+
+        // El cupo del galpón quedó liberado (0 ocupados de 100)
+        $data = $auth()->getJson('/api/v1/galpones')->assertStatus(200)->json('data');
+        $barn = collect($data)->firstWhere('id', $galpon->id);
+
+        $this->assertSame(0, (int) $barn['occupied_capacity'], 'La cosecha del lote de postura debe liberar el cupo.');
+        $this->assertSame(100, (int) $barn['available_capacity']);
+
+        // El "Costo Total de Cosecha" del lote avícola incluye el
+        // acumulado del costo de producción de huevos (1000 × 0.25
+        // = 250), aunque la cosecha no registre peso ni precio.
+        $lots = $auth()->getJson('/api/v1/lots')->assertStatus(200)->json('data');
+        $eggLot = collect($lots)->firstWhere('id', $lotId);
+        $this->assertNotNull($eggLot, 'El lote de postura debe estar en la lista.');
+        $this->assertEquals(
+            250.0,
+            round((float) ($eggLot['harvest_cost'] ?? 0), 2),
+            'El costo total de cosecha debe sumar el acumulado de la producción de huevos.'
+        );
+    }
+
+    /**
+     * La validación de propósito para registrar huevos acepta tanto
+     * "huevos" como "postura" (y variantes de mayúsculas/acentos),
+     * alineada con la lógica del frontend. Antes un lote con propósito
+     * "postura" recibía el falso error "solo aplica a lotes de producción
+     * de huevos".
+     */
+    public function test_egg_registration_accepts_postura_purpose(): void
+    {
+        [$farm, $admin, $token] = $this->createFarmWithAdmin('Granja Postura', 'admin_postura@test.com');
+
+        $species = $this->createSpecies($farm, 'avícola');
+
+        foreach (['postura', 'Postura', 'HUEVOS', 'huevos'] as $purpose) {
+            $galpon = $this->createGalpon($farm, $species, [
+                'category' => 'avícola',
+                'sector' => 'avícola',
+                'purpose' => $purpose,
+                'max_capacity' => 100,
+            ]);
+
+            $lotId = $this->withHeader('Authorization', 'Bearer '.$token)
+                ->postJson('/api/v1/lots', [
+                    'galpon_id' => $galpon->id,
+                    'species_id' => $species->id,
+                    'quantity' => 50,
+                ])->assertStatus(201)->json('data.id');
+
+            // El propósito se hereda del galpón; el registro de huevos
+            // debe aceptarse sin el falso error de propósito
+            $this->withHeader('Authorization', 'Bearer '.$token)
+                ->postJson("/api/v1/lots/{$lotId}/eggs", [
+                    'total_eggs' => 500,
+                    'broken_eggs' => 10,
+                    'egg_price' => 0.25,
+                ])
+                ->assertStatus(200)
+                ->assertJsonPath('data.total_eggs', 500)
+                ->assertJsonPath('data.total_egg_cost', '125.00') // 500 completos × 0.25
+                ->assertJsonPath('data.total_broken_cost', '2.50'); // 10 × 0.25
+        }
     }
 
     public function test_lote_multi_farm_isolation_on_index_and_boundary_checks(): void
@@ -1088,6 +1192,53 @@ class LotesModuleTest extends TestCase
 
         $this->assertNotNull($meatLot, 'El lote de carne debe estar en la lista.');
         $this->assertSame(4, (int) $meatLot['current_occupancy'], 'Un lote sin animales registrados debe mostrar su cantidad declarada.');
+    }
+
+    /**
+     * La columna "Cupo del Galpón" debe reflejar
+     * [Ocupación Actual] / [Capacidad Máxima], donde la
+     * ocupación actual es la SUMA de la cantidad de animales
+     * de TODOS los lotes ACTIVOS alojados en ese galpón.
+     *
+     * Un lote inactivo (cosechado/vendido) ya no ocupa cupo,
+     * por lo que NO debe sumarse al numerador.
+     */
+    public function test_barn_capacity_column_sums_only_active_lots_and_releases_on_harvest(): void
+    {
+        [$farm, $admin, $token] = $this->createFarmWithAdmin('Granja Cupo Columna', 'admin_cupo_columna@test.com');
+
+        $species = $this->createSpecies($farm);
+        $galpon = $this->createGalpon($farm, $species, ['max_capacity' => 100]);
+
+        $auth = fn () => $this->withHeader('Authorization', 'Bearer '.$token);
+
+        // Lote activo de 50 animales alojados
+        $lotId = $auth()->postJson('/api/v1/lots', [
+            'galpon_id' => $galpon->id,
+            'species_id' => $species->id,
+            'quantity' => 50,
+        ])->assertStatus(201)->json('data.id');
+
+        $galponesModule = Module::where('code', 'galpones')->first();
+        FarmModule::where('farm_id', $farm->id)
+            ->where('module_id', $galponesModule->id)
+            ->update(['is_enabled' => true]);
+
+        // La ocupación debe ser 50 / 100 (NO 100 / 100)
+        $data = $auth()->getJson('/api/v1/galpones')->assertStatus(200)->json('data');
+        $barn = collect($data)->firstWhere('id', $galpon->id);
+        $this->assertSame(50, (int) $barn['occupied_capacity'], 'La ocupación debe ser la suma de los lotes activos (50).');
+        $this->assertSame(50, (int) $barn['available_capacity']);
+
+        // El lote se inactiva (cosecha): el cupo se libera
+        $auth()->putJson("/api/v1/lots/{$lotId}", ['status' => 'inactivo'])
+            ->assertStatus(200);
+
+        // Tras inactivar, la ocupación baja a 0 / 100
+        $data = $auth()->getJson('/api/v1/galpones')->assertStatus(200)->json('data');
+        $barn = collect($data)->firstWhere('id', $galpon->id);
+        $this->assertSame(0, (int) $barn['occupied_capacity'], 'Un lote inactivo ya no debe ocupar cupo del galpón.');
+        $this->assertSame(100, (int) $barn['available_capacity']);
     }
 
     /**

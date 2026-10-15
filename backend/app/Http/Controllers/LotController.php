@@ -28,7 +28,12 @@ class LotController extends Controller
      */
     private function isEggPurpose(?string $purpose): bool
     {
-        return Species::normalizeKey($purpose) === 'huevos';
+        $key = Species::normalizeKey($purpose);
+
+        // Acepta tanto "huevos" como "postura" (y cualquier variante de
+        // mayúsculas/acentos), alineado con la lógica del frontend que
+        // muestra la acción "Recoger Huevos".
+        return $key === 'huevos' || $key === 'postura';
     }
 
     /**
@@ -987,24 +992,17 @@ class LotController extends Controller
         $totalEggs = (int) $request->total_eggs;
         $brokenEggs = (int) ($request->input('broken_eggs', 0));
 
-        if ($brokenEggs > $totalEggs) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Los huevos rotos no pueden superar el total de huevos.',
-                'errors' => [
-                    'broken_eggs' => ['Los huevos rotos no pueden superar el total de huevos.'],
-                ],
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
         $eggPrice = (float) $request->egg_price;
 
-        // Accumulate production history; capacity remains occupied until harvest
+        // Accumulate production history; capacity remains occupied until harvest.
+        // "Huevos Completos" (buenos) y "Huevos Rotos" son valores
+        // INDEPENDIENTES: el total recolectado es la SUMA de ambos.
+        // Costo de producción = completos × precio (base: los buenos).
         $lot->total_eggs += $totalEggs;
         $lot->broken_eggs += $brokenEggs;
         $lot->egg_price = round($eggPrice, 2);
-        $lot->total_egg_cost = round($lot->total_eggs * $eggPrice, 2);
-        $lot->total_broken_cost = round($lot->broken_eggs * $eggPrice, 2);
+        $lot->total_egg_cost = round((int) $lot->total_eggs * $eggPrice, 2);
+        $lot->total_broken_cost = round((int) $lot->broken_eggs * $eggPrice, 2);
         $lot->save();
 
         $lot->load([
@@ -1018,12 +1016,17 @@ class LotController extends Controller
             'message' => 'Producción de huevos registrada. El cupo del galpón se mantiene hasta la cosecha del lote.',
             'data' => $lot,
             'eggs' => [
+                // Huevos Completos (buenos): base del costo de producción
                 'total_eggs' => $lot->total_eggs,
+                // Huevos Rotos (mermas)
                 'broken_eggs' => $lot->broken_eggs,
+                // Total de Huevos = Completos + Rotos
+                'total_eggs_all' => (int) $lot->total_eggs + (int) $lot->broken_eggs,
                 'egg_price' => $lot->egg_price,
+                // Costo de producción = Completos × precio
                 'total_egg_cost' => $lot->total_egg_cost,
+                // Costo de mermas = Rotos × precio
                 'total_broken_cost' => $lot->total_broken_cost,
-                'good_eggs' => $lot->total_eggs - $lot->broken_eggs,
             ],
         ], Response::HTTP_OK);
     }

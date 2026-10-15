@@ -202,6 +202,12 @@ class Lot extends Model
      * presentes (ej. venta individual + total a nivel de lote), y el
      * valor coincide con el "Resumen de Cosecha" del modal detallado.
      * Los lotes sin cosechas → 0.
+     *
+     * Para lotes AVÍCOLAS DE POSTURA se suma además el acumulado
+     * del costo de producción de huevos (`total_egg_cost`), de modo
+     * que el "Costo Total de Cosecha" refleje también lo registrado
+     * vía "Recoger Huevos". En lotes de carne/reproducción ese
+     * valor es 0 y no altera el cálculo.
      */
     public static function loadHarvestCost(Collection $lots): void
     {
@@ -219,7 +225,17 @@ class Lot extends Model
             $individual = (float) ($costs[$lot->id] ?? 0);
             $lotLevel = (float) ($lot->total_price ?? 0);
 
-            $lot->setAttribute('harvest_cost', $individual > 0 ? $individual : $lotLevel);
+            // Costo animal / venta (carne, reproducción).
+            $animalCost = $individual > 0 ? $individual : $lotLevel;
+
+            // Lotes avícolas de postura: además del costo animal,
+            // se suma el acumulado de la producción de huevos
+            // registrado vía "Recoger Huevos" (total_egg_cost).
+            // En lotes de carne/reproducción este valor es 0, por
+            // lo que no altera el cálculo existente.
+            $eggCost = (float) ($lot->total_egg_cost ?? 0);
+
+            $lot->setAttribute('harvest_cost', round($animalCost + $eggCost, 2));
         });
     }
 
