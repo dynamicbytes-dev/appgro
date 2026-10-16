@@ -253,6 +253,11 @@ export interface Lot {
   egg_price: string | number | null;
   total_egg_cost: string | number | null;
   total_broken_cost: string | number | null;
+  /**
+   * Costo de inversión (adquisición) de los animales del lote.
+   * `null` = sin dato (se excluye de los totales de Analítica).
+   */
+  investment_cost: string | number | null;
   created_at?: string;
   updated_at?: string;
   galpon?: {
@@ -298,6 +303,10 @@ export interface CreateLotDTO {
   entry_date?: string;
   farm_id?: number | string;
   /**
+   * Costo de inversión (adquisición) de los animales del lote.
+   */
+  investment_cost?: number | null;
+  /**
    * Destetes de origen cuyos lechones vivos forman este lote
    * (flujo de lechones destetados). El backend valida la
    * cantidad EXACTA de vivos pendientes y marca los destetes
@@ -313,6 +322,10 @@ export interface UpdateLotDTO {
   purpose?: string;
   status?: string;
   entry_date?: string;
+  /**
+   * Costo de inversión (adquisición) de los animales del lote.
+   */
+  investment_cost?: number | null;
 }
 
 export interface HarvestLotDTO {

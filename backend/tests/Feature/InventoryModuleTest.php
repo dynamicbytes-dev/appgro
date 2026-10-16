@@ -126,11 +126,22 @@ class InventoryModuleTest extends TestCase
         $this->assertTrue(Schema::hasTable('inventory_movements'), 'Table inventory_movements must exist.');
         foreach ([
             'id', 'farm_id', 'inventory_item_id', 'type', 'quantity',
-            'resulting_stock', 'destination_lot_id', 'notes', 'movement_date', 'user_id',
+            'resulting_stock', 'destination_lot_id', 'inventory_lot_id', 'notes', 'movement_date', 'user_id',
         ] as $column) {
             $this->assertTrue(
                 Schema::hasColumn('inventory_movements', $column),
                 "Column '{$column}' is missing from 'inventory_movements'."
+            );
+        }
+
+        $this->assertTrue(Schema::hasTable('inventory_lots'), 'Table inventory_lots must exist.');
+        foreach ([
+            'id', 'farm_id', 'inventory_item_id', 'code', 'supplier_id',
+            'manufacturing_date', 'expiration_date', 'notes', 'created_by',
+        ] as $column) {
+            $this->assertTrue(
+                Schema::hasColumn('inventory_lots', $column),
+                "Column '{$column}' is missing from 'inventory_lots'."
             );
         }
     }

@@ -168,9 +168,11 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
   }, [farmId]);
 
   const filteredItems = useMemo(() => {
+    const list = Array.isArray(items) ? items : [];
     const term = searchTerm.trim().toLowerCase();
 
-    return items.filter((item) => {
+    return list.filter((item) => {
+      if (!item) return false;
       const matchesSearch =
         !term ||
         safeText(item.name, '').toLowerCase().includes(term) ||
@@ -314,18 +316,18 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
   };
 
   const summaryCards = [
-    { label: 'Insumos', value: stats?.total_items ?? items.length, icon: Package, color: 'text-[#1B4D3E] dark:text-[#6DBF5C]', bg: 'bg-[#1B4D3E]/10' },
-    { label: 'Valor total', value: formatMoney(stats?.total_value ?? 0), icon: PackagePlus, color: 'text-[#4E9F3D]', bg: 'bg-[#4E9F3D]/10' },
-    { label: 'Bajo mínimo', value: stats?.low_stock ?? 0, icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
-    { label: 'Por vencer', value: stats?.expiring ?? 0, icon: CalendarClock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+    { id: 'total-items', label: 'Insumos', value: stats?.total_items ?? (items || []).length, icon: Package, color: 'text-[#1B4D3E] dark:text-[#6DBF5C]', bg: 'bg-[#1B4D3E]/10' },
+    { id: 'total-value', label: 'Valor total', value: formatMoney(stats?.total_value ?? 0), icon: PackagePlus, color: 'text-[#4E9F3D]', bg: 'bg-[#4E9F3D]/10' },
+    { id: 'low-stock', label: 'Bajo mínimo', value: stats?.low_stock ?? 0, icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
+    { id: 'expiring-soon', label: 'Por vencer', value: stats?.expiring ?? 0, icon: CalendarClock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
   ];
 
   return (
     <div className="space-y-6">
       {/* Resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((card) => (
-          <Card key={card.label} className="p-4!">
+        {(summaryCards || []).map((card) => (
+          <Card key={card.id} className="p-4!">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center shrink-0`}>
                 <card.icon className={`w-5 h-5 ${card.color}`} />
@@ -364,11 +366,11 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
               </Button>
             </div>
 
-            {isAdmin && (
+            {isAdmin ? (
               <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
                 Nuevo Insumo
               </Button>
-            )}
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -385,8 +387,8 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
 
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={inputClasses}>
               <option value="">Todas las categorías</option>
-              {INVENTORY_CATEGORIES.map((category) => (
-                <option key={category.value} value={category.value}>
+              {(INVENTORY_CATEGORIES || []).map((category) => (
+                <option key={`cat-${category.value}`} value={category.value}>
                   {category.label}
                 </option>
               ))}
@@ -409,17 +411,17 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
 
       {/* Tabla */}
       <Card className="overflow-hidden p-0!">
-        {errorMessage && (
+        {errorMessage ? (
           <div className="m-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-gray-400">
             <RefreshCw className="w-6 h-6 animate-spin" />
           </div>
-        ) : filteredItems.length === 0 ? (
+        ) : (filteredItems || []).length === 0 ? (
           <div className="py-16 text-center text-gray-400 dark:text-gray-500">
             <Package className="w-10 h-10 mx-auto mb-3 opacity-40" />
             <p className="font-semibold">No hay insumos registrados.</p>
@@ -443,18 +445,23 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#263632]">
-                {filteredItems.map((item) => {
-                  const alerts = item.alert_flags ?? [];
+                {(filteredItems || []).map((item) => {
+                  const alerts = Array.isArray(item?.alert_flags) ? item.alert_flags : [];
+                  const itemId = item.id ? String(item.id) : `item-fallback-${item.code || item.name}`;
 
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
+                    <tr key={itemId} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
                       <td className="px-4 py-3 max-w-[240px]">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
                             {safeText(item.code, '')}
                           </span>
-                          {alerts.map((flag) => (
-                            <Badge key={flag} variant={ALERT_BADGE_VARIANT[flag] ?? 'warning'} className="text-[10px]!">
+                          {alerts.map((flag, flagIdx) => (
+                            <Badge
+                              key={`${itemId}-flag-${flag}-${flagIdx}`}
+                              variant={ALERT_BADGE_VARIANT[flag] ?? 'warning'}
+                              className="text-[10px]!"
+                            >
                               {INVENTORY_ALERT_LABELS[flag] ?? flag}
                             </Badge>
                           ))}
@@ -462,9 +469,9 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                         <p className="font-semibold text-sm text-[#1E1E1E] dark:text-gray-100 truncate mt-0.5">
                           {safeText(item.name, `Insumo #${item.id}`)}
                         </p>
-                        {item.location && (
+                        {item.location ? (
                           <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{safeText(item.location, '')}</p>
-                        )}
+                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs text-gray-700 dark:text-gray-200">
@@ -476,10 +483,10 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                           {formatQtyWithUnit(item.current_stock, item.unit)}
                         </p>
                         <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Mín: {formatQtyWithUnit(item.min_stock, item.unit)}
-                          {item.max_stock !== null && item.max_stock !== undefined
-                            ? ` · Máx: ${formatQtyWithUnit(item.max_stock, item.unit)}`
-                            : ''}
+                          <span>Mín: {formatQtyWithUnit(item.min_stock, item.unit)}</span>
+                          {item.max_stock !== null && item.max_stock !== undefined ? (
+                            <span>{` · Máx: ${formatQtyWithUnit(item.max_stock, item.unit)}`}</span>
+                          ) : null}
                         </p>
                       </td>
                       <td className="px-4 py-3">
@@ -495,6 +502,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedItem(item);
                               setIsDetailModalOpen(true);
@@ -506,6 +514,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedItem(item);
                               setIsMovementModalOpen(true);
@@ -516,9 +525,10 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                             <PackagePlus className="w-4 h-4" />
                           </button>
 
-                          {isAdmin && (
+                          {isAdmin ? (
                             <>
                               <button
+                                type="button"
                                 onClick={() => openEditModal(item)}
                                 className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                                 title="Editar insumo"
@@ -527,6 +537,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                               </button>
 
                               <button
+                                type="button"
                                 onClick={() => {
                                   setSelectedItem(item);
                                   setIsDeleteModalOpen(true);
@@ -537,7 +548,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </>
-                          )}
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -574,7 +585,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 placeholder="Ej: Balanceado de crecimiento"
                 className={inputClasses}
               />
-              {formErrors.name && <p className="text-xs text-red-600 mt-1">{formErrors.name}</p>}
+              {formErrors.name ? <p className="text-xs text-red-600 mt-1">{formErrors.name}</p> : null}
             </div>
 
             <div>
@@ -586,13 +597,13 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
                 className={inputClasses}
               >
-                {INVENTORY_CATEGORIES.map((category) => (
-                  <option key={category.value} value={category.value}>
+                {(INVENTORY_CATEGORIES || []).map((category) => (
+                  <option key={`form-cat-${category.value}`} value={category.value}>
                     {category.label}
                   </option>
                 ))}
               </select>
-              {formErrors.category && <p className="text-xs text-red-600 mt-1">{formErrors.category}</p>}
+              {formErrors.category ? <p className="text-xs text-red-600 mt-1">{formErrors.category}</p> : null}
             </div>
 
             <div>
@@ -604,13 +615,13 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
                 className={inputClasses}
               >
-                {INVENTORY_UNITS.map((unit) => (
-                  <option key={unit.value} value={unit.value}>
+                {(INVENTORY_UNITS || []).map((unit) => (
+                  <option key={`form-unit-${unit.value}`} value={unit.value}>
                     {unit.label} ({unit.short})
                   </option>
                 ))}
               </select>
-              {formErrors.unit && <p className="text-xs text-red-600 mt-1">{formErrors.unit}</p>}
+              {formErrors.unit ? <p className="text-xs text-red-600 mt-1">{formErrors.unit}</p> : null}
             </div>
           </div>
 
@@ -627,7 +638,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 placeholder="Ej: 10"
                 className={inputClasses}
               />
-              {formErrors.min_stock && <p className="text-xs text-red-600 mt-1">{formErrors.min_stock}</p>}
+              {formErrors.min_stock ? <p className="text-xs text-red-600 mt-1">{formErrors.min_stock}</p> : null}
             </div>
 
             <div>
@@ -642,10 +653,10 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 placeholder="Ej: 500"
                 className={inputClasses}
               />
-              {formErrors.max_stock && <p className="text-xs text-red-600 mt-1">{formErrors.max_stock}</p>}
+              {formErrors.max_stock ? <p className="text-xs text-red-600 mt-1">{formErrors.max_stock}</p> : null}
             </div>
 
-            {!selectedItem && (
+            {!selectedItem ? (
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                   Stock inicial ({unitShortOf(form.unit)})
@@ -658,9 +669,9 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                   placeholder="Ej: 100"
                   className={inputClasses}
                 />
-                {formErrors.current_stock && <p className="text-xs text-red-600 mt-1">{formErrors.current_stock}</p>}
+                {formErrors.current_stock ? <p className="text-xs text-red-600 mt-1">{formErrors.current_stock}</p> : null}
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -687,8 +698,8 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 className={inputClasses}
               >
                 <option value="">Sin bodega asignada</option>
-                {warehouseOptions.map((warehouse) => (
-                  <option key={warehouse.id} value={warehouse.id}>
+                {(warehouseOptions || []).map((warehouse) => (
+                  <option key={`form-wh-${warehouse.id}`} value={warehouse.id}>
                     {safeText(warehouse.name, `Bodega #${warehouse.id}`)}
                     {warehouse.is_active ? '' : ' (inactiva)'}
                   </option>
@@ -736,7 +747,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 placeholder="Ej: 2.50"
                 className={inputClasses}
               />
-              {formErrors.unit_cost && <p className="text-xs text-red-600 mt-1">{formErrors.unit_cost}</p>}
+              {formErrors.unit_cost ? <p className="text-xs text-red-600 mt-1">{formErrors.unit_cost}</p> : null}
             </div>
 
             <div>
@@ -749,8 +760,8 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 className={inputClasses}
               >
                 <option value="">Sin proveedor</option>
-                {supplierOptions.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
+                {(supplierOptions || []).map((supplier) => (
+                  <option key={`form-sup-${supplier.id}`} value={supplier.id}>
                     {safeText(supplier.name, `Proveedor #${supplier.id}`)}
                     {supplier.is_active ? '' : ' (inactivo)'}
                   </option>
@@ -798,17 +809,17 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
         subtitle={selectedItem ? `${safeText(selectedItem.code, '')} · ${safeText(selectedItem.name, '')}` : undefined}
         maxWidth="lg"
       >
-        {selectedItem && (
+        {selectedItem ? (
           <div className="space-y-4">
-            {(selectedItem.alert_flags ?? []).length > 0 && (
+            {(selectedItem.alert_flags ?? []).length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {(selectedItem.alert_flags ?? []).map((flag) => (
-                  <Badge key={flag} variant={ALERT_BADGE_VARIANT[flag] ?? 'warning'}>
+                {(selectedItem.alert_flags ?? []).map((flag, flagIdx) => (
+                  <Badge key={`${selectedItem.id}-detail-flag-${flag}-${flagIdx}`} variant={ALERT_BADGE_VARIANT[flag] ?? 'warning'}>
                     {INVENTORY_ALERT_LABELS[flag] ?? flag}
                   </Badge>
                 ))}
               </div>
-            )}
+            ) : null}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <Field label="Stock actual" value={formatQtyWithUnit(selectedItem.current_stock, selectedItem.unit)} />
@@ -836,7 +847,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
               <Field label="Última compra" value={formatDate(selectedItem.last_purchase_date)} />
             </div>
           </div>
-        )}
+        ) : null}
       </Modal>
 
       {/* Modal Eliminar */}
@@ -855,9 +866,9 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
               <XCircle className="w-5 h-5 text-red-600" />
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-200">
-              ¿Seguro que deseas eliminar el insumo{' '}
-              <span className="font-semibold">«{safeText(selectedItem?.name, '')}»</span>? También se eliminarán sus
-              movimientos asociados.
+              <span>¿Seguro que deseas eliminar el insumo </span>
+              <span className="font-semibold">«{safeText(selectedItem?.name, '')}»</span>
+              <span>? También se eliminarán sus movimientos asociados.</span>
             </p>
           </div>
 

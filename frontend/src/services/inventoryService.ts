@@ -1,6 +1,7 @@
 import { api } from './api';
 import type {
   CreateInventoryItemDTO,
+  CreateInventoryLotDTO,
   CreateInventoryMovementDTO,
   CreateInventorySupplierDTO,
   CreateInventoryWarehouseDTO,
@@ -9,12 +10,15 @@ import type {
   InventoryFilters,
   InventoryItem,
   InventoryListResponse,
+  InventoryLot,
+  InventoryLotFilters,
   InventoryMovement,
   InventoryMovementFilters,
   InventoryStats,
   InventorySupplier,
   InventoryWarehouse,
   UpdateInventoryItemDTO,
+  UpdateInventoryLotDTO,
   UpdateInventorySupplierDTO,
   UpdateInventoryWarehouseDTO,
 } from '../types/inventory';
@@ -143,6 +147,7 @@ export const inventoryService = {
     if (params?.type) query.type = params.type;
     if (params?.inventory_item_id) query.inventory_item_id = params.inventory_item_id;
     if (params?.destination_lot_id) query.destination_lot_id = params.destination_lot_id;
+    if (params?.inventory_lot_id) query.inventory_lot_id = params.inventory_lot_id;
     if (params?.from) query.from = params.from;
     if (params?.to) query.to = params.to;
     if (params?.farm_id && params.farm_id !== 'all') query.farm_id = params.farm_id;
@@ -209,5 +214,33 @@ export const inventoryService = {
 
   removeWarehouse: async (id: number | string): Promise<void> => {
     await api.delete(`/inventory/warehouses/${id}`);
+  },
+
+  /* ------------------------------------------------------------------ */
+  /* Lotes de insumos                                                    */
+  /* ------------------------------------------------------------------ */
+
+  getLots: async (params?: InventoryLotFilters): Promise<InventoryLot[]> => {
+    const query: Record<string, string | number> = {};
+    if (params?.search) query.search = params.search;
+    if (params?.inventory_item_id) query.inventory_item_id = params.inventory_item_id;
+    if (params?.farm_id && params.farm_id !== 'all') query.farm_id = params.farm_id;
+
+    const response = await api.get('/inventory/lots', { params: query });
+    return response.data?.data ?? [];
+  },
+
+  createLot: async (payload: CreateInventoryLotDTO): Promise<InventoryLot> => {
+    const response = await api.post('/inventory/lots', payload);
+    return response.data?.data ?? response.data;
+  },
+
+  updateLot: async (id: number | string, payload: UpdateInventoryLotDTO): Promise<InventoryLot> => {
+    const response = await api.put(`/inventory/lots/${id}`, payload);
+    return response.data?.data ?? response.data;
+  },
+
+  removeLot: async (id: number | string): Promise<void> => {
+    await api.delete(`/inventory/lots/${id}`);
   },
 };

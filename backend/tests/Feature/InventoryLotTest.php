@@ -1,0 +1,384 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Farm;
+use App\Models\InventoryItem;
+use App\Models\InventoryLot;
+use App\Models\Module;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
+use Tests\TestCase;
+
+class InventoryLotTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /**
+     * Granja con módulo de inventario + admin autenticado + subordinado.
+     * Devuelve [$farm, $admin, $token, $subordinate].
+     */
+    private function createFarmWithAdminAndSubordinate(string $name, string $email): array
+    {
+        $this->artisan('app:init-root');
+
+        $farm = Farm::create([
+            'name' => $name,
+            'sector' => 'porcino',
+            'is_active' => true,
+        ]);
+
+        $module = Module::where('code', 'inventory')->first();
+
+        DB::table('farm_modules')->updateOrInsert(
+            ['farm_id' => $farm->id, 'module_id' => $module->id],
+            ['is_enabled' => true]
+        );
+
+        $admin = User::create([
+            'farm_id' => $farm->id,
+            'name' => 'Admin Lotes',
+            'email' => $email,
+            'password_hash' => Hash::make('password123'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $subordinate = User::create([
+            'farm_id' => $farm->id,
+            'name' => 'Peón',
+            'lastname' => 'Bodega',
+            'email' => 'encargado_'.$email,
+            'password_hash' => Hash::make('password123'),
+            'role' => 'subordinate',
+            'is_active' => true,
+        ]);
+
+        DB::table('subordinate_modules')->updateOrInsert(
+            ['user_id' => $subordinate->id, 'module_id' => $module->id],
+            ['is_enabled' => true]
+        );
+
+        return [$farm, $admin, $this->loginToken($email), $subordinate];
+    }
+
+    private function loginToken(string $email): string
+    {
+        return $this->postJson('/api/v1/auth/login', [
+            'email' => $email,
+            'password' => 'password123',
+        ])->json('data.access_token');
+    }
+
+    private function createRoot(string $email = 'root_lotes@test.com'): string
+    {
+        $this->artisan('app:init-root');
+
+        User::create([
+            'farm_id' => null,
+            'name' => 'Root Lotes',
+            'email' => $email,
+            'password_hash' => Hash::make('password123'),
+            'role' => 'root',
+            'is_active' => true,
+        ]);
+
+        return $this->loginToken($email);
+    }
+
+    private function makeItem(int $farmId, string $name = 'Maíz molido'): InventoryItem
+    {
+        return InventoryItem::create([
+            'farm_id' => $farmId,
+            'code' => InventoryItem::generateCode($farmId),
+            'name' => $name,
+            'category' => InventoryItem::CATEGORY_ALIMENTOS,
+            'unit' => 'kg',
+            'current_stock' => 0,
+            'min_stock' => 5,
+            'unit_cost' => 2,
+            'total_cost' => 0,
+        ]);
+    }
+
+    public function test_inventory_lots_schema_exists(): void
+    {
+        $this->assertTrue(Schema::hasTable('inventory_lots'));
+
+        foreach ([
+            'id', 'farm_id', 'inventory_item_id', 'code', 'supplier_id',
+            'manufacturing_date', 'expiration_date', 'notes', 'created_by',
+        ] as $column) {
+            $this->assertTrue(
+                Schema::hasColumn('inventory_lots', $column),
+                "Falta '{$column}' en inventory_lots."
+            );
+        }
+
+        $this->assertTrue(Schema::hasColumn('inventory_movements', 'inventory_lot_id'));
+    }
+
+    public function test_admin_can_create_and_list_lots(): void
+    {
+        [$farm, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Lotes', 'admin_lotes@test.com');
+
+        $item = $this->makeItem($farm->id);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/lots', [
+                'code' => 'LOTE-A1',
+                'inventory_item_id' => $item->id,
+                'manufacturing_date' => now()->subMonth()->toDateString(),
+                'expiration_date' => now()->addYear()->toDateString(),
+            ])
+            ->assertStatus(201)
+            ->assertJson(['status' => 'success'])
+            ->assertJsonPath('data.code', 'LOTE-A1');
+
+        $this->assertDatabaseHas('inventory_lots', [
+            'farm_id' => $farm->id,
+            'code' => 'LOTE-A1',
+            'inventory_item_id' => $item->id,
+        ]);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/inventory/lots')
+            ->assertStatus(200);
+
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('LOTE-A1', $response->json('data.0.code'));
+        $this->assertSame($item->code, $response->json('data.0.item_code'));
+    }
+
+    public function test_code_is_autogenerated_when_omitted(): void
+    {
+        [$farm, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Auto', 'admin_auto_lotes@test.com');
+
+        $first = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/lots', [])
+            ->assertStatus(201);
+
+        $second = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/lots', [])
+            ->assertStatus(201);
+
+        $this->assertSame('LOTE-00001', $first->json('data.code'));
+        $this->assertSame('LOTE-00002', $second->json('data.code'));
+
+        $this->assertDatabaseHas('inventory_lots', [
+            'farm_id' => $farm->id,
+            'code' => 'LOTE-00001',
+        ]);
+    }
+
+    public function test_lot_code_is_unique_per_farm(): void
+    {
+        [, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Dup Lote', 'admin_dup_lote@test.com');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/lots', ['code' => 'REPETIDO'])
+            ->assertStatus(201);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/lots', ['code' => 'REPETIDO'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['code']);
+    }
+
+    public function test_subordinate_can_read_and_create_lots_but_not_manage(): void
+    {
+        [, , , $subordinate] = $this->createFarmWithAdminAndSubordinate('Granja Rol Lote', 'admin_rol_lote@test.com');
+
+        $token = $this->loginToken($subordinate->email);
+
+        $created = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/lots', ['code' => 'LOTE-PEON'])
+            ->assertStatus(201);
+
+        $lotId = $created->json('data.id');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/inventory/lots')
+            ->assertStatus(200)
+            ->assertJson(['status' => 'success']);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/v1/inventory/lots/'.$lotId, ['code' => 'EDITADO'])
+            ->assertStatus(403);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->deleteJson('/api/v1/inventory/lots/'.$lotId)
+            ->assertStatus(403);
+    }
+
+    public function test_lots_are_isolated_by_farm(): void
+    {
+        [$farm, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Propia Lote', 'admin_prop_lote@test.com');
+
+        $otherFarm = Farm::create(['name' => 'Granja Ajena Lote', 'sector' => 'bovino', 'is_active' => true]);
+        InventoryLot::create(['farm_id' => $otherFarm->id, 'code' => 'AJENO']);
+        InventoryLot::create(['farm_id' => $farm->id, 'code' => 'PROPIO']);
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/inventory/lots')
+            ->assertStatus(200);
+
+        $codes = collect($response->json('data'))->pluck('code')->all();
+        $this->assertContains('PROPIO', $codes);
+        $this->assertNotContains('AJENO', $codes);
+    }
+
+    public function test_lot_rejects_item_from_another_farm(): void
+    {
+        [, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Cruce Lote', 'admin_cruce_lote@test.com');
+
+        $otherFarm = Farm::create(['name' => 'Granja Cruzada', 'sector' => 'bovino', 'is_active' => true]);
+        $foreignItem = $this->makeItem($otherFarm->id, 'Insumo ajeno');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/lots', [
+                'code' => 'CRUCE',
+                'inventory_item_id' => $foreignItem->id,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['inventory_item_id']);
+    }
+
+    public function test_root_must_specify_farm_to_create_lot(): void
+    {
+        $this->createFarmWithAdminAndSubordinate('Granja Root Lote', 'admin_root_lote@test.com');
+        $root = $this->createRoot();
+
+        $farm = Farm::create(['name' => 'Granja Root Destino', 'sector' => 'porcino', 'is_active' => true]);
+
+        $this->withHeader('Authorization', 'Bearer '.$root)
+            ->postJson('/api/v1/inventory/lots', ['code' => 'SIN-GRANJA'])
+            ->assertStatus(422);
+
+        $this->withHeader('Authorization', 'Bearer '.$root)
+            ->postJson('/api/v1/inventory/lots', ['code' => 'GLOBAL', 'farm_id' => $farm->id])
+            ->assertStatus(201);
+
+        $this->assertDatabaseHas('inventory_lots', [
+            'farm_id' => $farm->id,
+            'code' => 'GLOBAL',
+        ]);
+    }
+
+    public function test_entry_movement_links_lot_and_syncs_item_batch_and_expiration(): void
+    {
+        [$farm, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Entrada Lote', 'admin_entrada_lote@test.com');
+
+        $item = $this->makeItem($farm->id);
+
+        $lot = InventoryLot::create([
+            'farm_id' => $farm->id,
+            'inventory_item_id' => $item->id,
+            'code' => 'LOTE-RECIBIDO',
+            'manufacturing_date' => now()->subDays(10)->toDateString(),
+            'expiration_date' => now()->addMonths(6)->toDateString(),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/movements', [
+                'inventory_item_id' => $item->id,
+                'type' => 'entrada',
+                'quantity' => 25,
+                'inventory_lot_id' => $lot->id,
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.inventory_lot_id', $lot->id)
+            ->assertJsonPath('data.inventory_lot_code', 'LOTE-RECIBIDO');
+
+        $this->assertDatabaseHas('inventory_movements', [
+            'inventory_item_id' => $item->id,
+            'type' => 'entrada',
+            'inventory_lot_id' => $lot->id,
+        ]);
+
+        $fresh = $item->fresh();
+        $this->assertSame('LOTE-RECIBIDO', $fresh->batch_number);
+        $this->assertSame(now()->addMonths(6)->toDateString(), $fresh->expiration_date->toDateString());
+        $this->assertEquals(25.0, (float) $fresh->current_stock);
+    }
+
+    public function test_a_free_lot_is_assigned_to_the_item_on_first_entry(): void
+    {
+        [$farm, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Libre Lote', 'admin_libre_lote@test.com');
+
+        $item = $this->makeItem($farm->id);
+
+        // Lote creado sin insumo asociado (queda "libre").
+        $lot = InventoryLot::create([
+            'farm_id' => $farm->id,
+            'code' => 'LOTE-LIBRE',
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/movements', [
+                'inventory_item_id' => $item->id,
+                'type' => 'entrada',
+                'quantity' => 5,
+                'inventory_lot_id' => $lot->id,
+            ])
+            ->assertStatus(201);
+
+        $this->assertSame($item->id, $lot->fresh()->inventory_item_id);
+    }
+
+    public function test_entry_movement_rejects_lot_from_another_farm(): void
+    {
+        [$farm, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Ajena Entrada', 'admin_ajena_entrada@test.com');
+
+        $item = $this->makeItem($farm->id);
+
+        $otherFarm = Farm::create(['name' => 'Granja con lote ajeno', 'sector' => 'bovino', 'is_active' => true]);
+        $foreignLot = InventoryLot::create(['farm_id' => $otherFarm->id, 'code' => 'AJENO-1']);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/movements', [
+                'inventory_item_id' => $item->id,
+                'type' => 'entrada',
+                'quantity' => 5,
+                'inventory_lot_id' => $foreignLot->id,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['inventory_lot_id']);
+    }
+
+    public function test_destroy_unlinks_movements_referencing_the_lot(): void
+    {
+        [$farm, , $token] = $this->createFarmWithAdminAndSubordinate('Granja Borrado Lote', 'admin_borrado_lote@test.com');
+
+        $item = $this->makeItem($farm->id);
+
+        $lot = InventoryLot::create([
+            'farm_id' => $farm->id,
+            'inventory_item_id' => $item->id,
+            'code' => 'LOTE-BORRAR',
+        ]);
+
+        $movementResponse = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/inventory/movements', [
+                'inventory_item_id' => $item->id,
+                'type' => 'entrada',
+                'quantity' => 3,
+                'inventory_lot_id' => $lot->id,
+            ])
+            ->assertStatus(201);
+
+        $movementId = $movementResponse->json('data.id');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->deleteJson('/api/v1/inventory/lots/'.$lot->id)
+            ->assertStatus(200);
+
+        $this->assertDatabaseMissing('inventory_lots', ['id' => $lot->id]);
+        $this->assertNull(
+            DB::table('inventory_movements')->where('id', $movementId)->value('inventory_lot_id')
+        );
+    }
+}

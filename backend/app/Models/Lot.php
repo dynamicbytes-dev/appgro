@@ -56,6 +56,7 @@ class Lot extends Model
         'egg_price',
         'total_egg_cost',
         'total_broken_cost',
+        'investment_cost',
     ];
 
     protected $casts = [
@@ -75,6 +76,7 @@ class Lot extends Model
         'egg_price' => 'decimal:2',
         'total_egg_cost' => 'decimal:2',
         'total_broken_cost' => 'decimal:2',
+        'investment_cost' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -110,6 +112,31 @@ class Lot extends Model
     public function animals()
     {
         return $this->hasMany(LoteAnimal::class, 'lote_id');
+    }
+
+    /**
+     * Historial de producción de huevos del lote (serie temporal).
+     */
+    public function eggProductions()
+    {
+        return $this->hasMany(EggProduction::class, 'lot_id')->orderBy('production_date');
+    }
+
+    /**
+     * Costo total de inversión + producción de huevos del lote.
+     *
+     * No incluye insumos consumidos: `inventory_movements` no se
+     * relaciona con lotes de animales, por lo que ese costo solo se
+     * puede agregar a nivel de granja.
+     */
+    public function totalProductionCost(): float
+    {
+        return round(
+            (float) ($this->investment_cost ?? 0)
+                + (float) ($this->total_egg_cost ?? 0)
+                + (float) ($this->total_broken_cost ?? 0),
+            2
+        );
     }
 
     public function scopeActive($query)

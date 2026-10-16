@@ -106,11 +106,12 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
   }, [loadMovements]);
 
   const summary = useMemo(() => {
+    const list = Array.isArray(movements) ? movements : [];
     return {
-      total: movements.length,
-      entradas: movements.filter((m) => m.type === 'entrada').length,
-      salidas: movements.filter((m) => m.type === 'salida').length,
-      ajustes: movements.filter((m) => m.type === 'ajuste').length,
+      total: list.length,
+      entradas: list.filter((m) => m?.type === 'entrada').length,
+      salidas: list.filter((m) => m?.type === 'salida').length,
+      ajustes: list.filter((m) => m?.type === 'ajuste').length,
     };
   }, [movements]);
 
@@ -161,8 +162,8 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className={inputClasses}>
               <option value="">Todos los tipos</option>
-              {INVENTORY_MOVEMENT_TYPES.map((option) => (
-                <option key={option.value} value={option.value}>
+              {(INVENTORY_MOVEMENT_TYPES || []).map((option) => (
+                <option key={`type-opt-${option.value}`} value={option.value}>
                   {option.label}
                 </option>
               ))}
@@ -170,8 +171,8 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
 
             <select value={itemFilter} onChange={(e) => setItemFilter(e.target.value)} className={inputClasses}>
               <option value="">Todos los insumos</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
+              {(items || []).map((item) => (
+                <option key={`item-opt-${item.id}`} value={item.id}>
                   {safeText(item.code, '')} · {safeText(item.name, `Insumo #${item.id}`)}
                 </option>
               ))}
@@ -182,17 +183,17 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
 
       {/* Tabla */}
       <Card className="overflow-hidden p-0!">
-        {errorMessage && (
+        {errorMessage ? (
           <div className="m-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-gray-400">
             <RefreshCw className="w-6 h-6 animate-spin" />
           </div>
-        ) : movements.length === 0 ? (
+        ) : (movements || []).length === 0 ? (
           <div className="py-16 text-center text-gray-400 dark:text-gray-500">
             <History className="w-10 h-10 mx-auto mb-3 opacity-40" />
             <p className="font-semibold">No hay movimientos registrados.</p>
@@ -208,61 +209,72 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
                   <th className="px-4 py-3 font-bold">Tipo</th>
                   <th className="px-4 py-3 font-bold">Cantidad</th>
                   <th className="px-4 py-3 font-bold">Stock resultante</th>
-                  <th className="px-4 py-3 font-bold">Destino</th>
+                  <th className="px-4 py-3 font-bold">Lote / Destino</th>
                   <th className="px-4 py-3 font-bold">Responsable</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#263632]">
-                {movements.map((movement) => (
-                  <tr key={movement.id} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
-                    <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                      {formatDateTime(movement.movement_date ?? movement.created_at)}
-                    </td>
-                    <td className="px-4 py-3 max-w-[200px]">
-                      <span className="font-mono text-[11px] font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
-                        {safeText(movement.item_code ?? movement.item?.code ?? '', '')}
-                      </span>
-                      <p className="text-sm text-gray-700 dark:text-gray-200 truncate">
-                        {safeText(movement.item_name ?? movement.item?.name ?? '', '—')}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5">
-                        {TYPE_ICON[movement.type]}
-                        <Badge variant={MOVEMENT_BADGE_VARIANT[movement.type] ?? 'primary'} className="text-[10px]!">
-                          {safeText(movement.type_label ?? INVENTORY_MOVEMENT_LABELS[movement.type], movement.type)}
-                        </Badge>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-sm font-bold ${
-                          movement.type === 'entrada'
-                            ? 'text-[#4E9F3D]'
-                            : movement.type === 'salida'
-                              ? 'text-blue-600 dark:text-blue-400'
-                              : 'text-amber-600 dark:text-amber-400'
-                        }`}
-                      >
-                        {signedQty(movement)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-[#1E1E1E] dark:text-gray-100">
-                      {formatQtyWithUnit(movement.resulting_stock, movement.unit ?? movement.item?.unit)}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
-                      {safeText(movement.lot_code ?? movement.lot?.code ?? '', '—')}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
-                      {safeText(movement.responsible_name ?? movement.user?.name ?? '', '—')}
-                      {movement.notes && (
-                        <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[160px]" title={movement.notes}>
-                          {safeText(movement.notes, '')}
+                {(movements || []).map((movement) => {
+                  const movementId = movement.id ? String(movement.id) : `mov-${Math.random()}`;
+
+                  return (
+                    <tr key={`movement-${movementId}`} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
+                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                        {formatDateTime(movement.movement_date ?? movement.created_at)}
+                      </td>
+                      <td className="px-4 py-3 max-w-[200px]">
+                        <span className="font-mono text-[11px] font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
+                          {safeText(movement.item_code ?? movement.item?.code ?? '', '')}
+                        </span>
+                        <p className="text-sm text-gray-700 dark:text-gray-200 truncate">
+                          {safeText(movement.item_name ?? movement.item?.name ?? '', '—')}
                         </p>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5">
+                          {TYPE_ICON[movement.type]}
+                          <Badge variant={MOVEMENT_BADGE_VARIANT[movement.type] ?? 'primary'} className="text-[10px]!">
+                            {safeText(movement.type_label ?? INVENTORY_MOVEMENT_LABELS[movement.type], movement.type)}
+                          </Badge>
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`text-sm font-bold ${
+                            movement.type === 'entrada'
+                              ? 'text-[#4E9F3D]'
+                              : movement.type === 'salida'
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-amber-600 dark:text-amber-400'
+                          }`}
+                        >
+                          {signedQty(movement)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-[#1E1E1E] dark:text-gray-100">
+                        {formatQtyWithUnit(movement.resulting_stock, movement.unit ?? movement.item?.unit)}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
+                        {safeText(
+                          movement.inventory_lot_code ??
+                            movement.inventory_lot?.code ??
+                            movement.lot_code ??
+                            movement.lot?.code ??
+                            '',
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
+                        {safeText(movement.responsible_name ?? movement.user?.name ?? '', '—')}
+                        {movement.notes ? (
+                          <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[160px]" title={movement.notes}>
+                            {safeText(movement.notes, '')}
+                          </p>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnimalService;
+use App\Models\EggProduction;
 use App\Models\Galpon;
 use App\Models\Lot;
 use App\Models\LoteAnimal;
@@ -382,6 +383,7 @@ class LotController extends Controller
             'quantity' => 'required|integer|min:1',
             'purpose' => 'nullable|string|max:255',
             'entry_date' => 'nullable|date',
+            'investment_cost' => 'nullable|numeric|min:0',
             'farm_id' => 'nullable|exists:farms,id',
             // Destetes de origen (lote de lechones destetados)
             'from_service_ids' => 'nullable|array',
@@ -572,6 +574,9 @@ class LotController extends Controller
                 'quantity' => (int) $request->quantity,
                 'status' => Lot::STATUS_ACTIVE,
                 'entry_date' => $request->filled('entry_date') ? $request->input('entry_date') : now()->toDateString(),
+                'investment_cost' => $request->filled('investment_cost')
+                    ? round((float) $request->input('investment_cost'), 2)
+                    : null,
             ]);
 
             // Resolver los destetes vinculados: sus lechones vivos
@@ -653,6 +658,7 @@ class LotController extends Controller
             'purpose' => 'nullable|string|max:255',
             'status' => 'sometimes|required|string|in:activo,inactivo',
             'entry_date' => 'nullable|date',
+            'investment_cost' => 'nullable|numeric|min:0',
         ], [
             'quantity.min' => 'La cantidad debe ser de al menos 1 animal.',
             'status.in' => 'El estado del lote debe ser activo o inactivo.',
@@ -761,6 +767,12 @@ class LotController extends Controller
 
         if ($request->filled('entry_date')) {
             $lot->entry_date = $request->input('entry_date');
+        }
+
+        if ($request->has('investment_cost')) {
+            $lot->investment_cost = $request->filled('investment_cost')
+                ? round((float) $request->input('investment_cost'), 2)
+                : null;
         }
 
         // Status change: reactivating a lot must respect the barn capacity
@@ -1004,6 +1016,20 @@ class LotController extends Controller
         $lot->total_egg_cost = round((int) $lot->total_eggs * $eggPrice, 2);
         $lot->total_broken_cost = round((int) $lot->broken_eggs * $eggPrice, 2);
         $lot->save();
+
+        // Historial por fecha: permite construir la serie temporal de
+        // mermas (buenos vs. rotos) en el módulo de Analítica.
+        EggProduction::create([
+            'farm_id' => $lot->farm_id,
+            'lot_id' => $lot->id,
+            'production_date' => now()->toDateString(),
+            'good_eggs' => $totalEggs,
+            'broken_eggs' => $brokenEggs,
+            'egg_price' => round($eggPrice, 2),
+            'good_cost' => round($totalEggs * $eggPrice, 2),
+            'broken_cost' => round($brokenEggs * $eggPrice, 2),
+            'created_by' => $user?->id,
+        ]);
 
         $lot->load([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',

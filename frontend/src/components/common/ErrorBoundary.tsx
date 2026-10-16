@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { ZootikaLogo } from './ZootikaLogo';
 
 interface Props {
   children?: ReactNode;
@@ -60,6 +61,11 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-[400px] flex items-center justify-center bg-[#F9F9F9] dark:bg-[#0F1715] p-6 rounded-3xl animate-in fade-in duration-200">
           <div className="max-w-md w-full bg-white dark:bg-[#18221F] rounded-3xl p-8 shadow-xl border border-gray-200 dark:border-[#263632] text-center">
+            {/* Brand Header */}
+            <div className="flex justify-center mb-5">
+              <ZootikaLogo size="sm" showText={true} textVariant="auto" />
+            </div>
+
             {/* Header Icon */}
             <div className="w-14 h-14 bg-amber-50 dark:bg-amber-950/40 rounded-2xl flex items-center justify-center text-[#1B4D3E] dark:text-[#4E9F3D] mx-auto mb-4 border border-amber-200 dark:border-amber-900">
               <AlertTriangle className="w-7 h-7 text-[#1B4D3E] dark:text-[#4E9F3D]" />

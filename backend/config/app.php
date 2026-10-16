@@ -13,7 +13,23 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => env('APP_NAME', 'Zootika'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Official Branding & Assets
+    |--------------------------------------------------------------------------
+    */
+    'logo_url' => env('APP_LOGO_URL', '/logo-zootika.png'),
+
+    'logo_path' => public_path('logo-zootika.png'),
+
+    'colors' => [
+        'forest_green' => '#064E3B',
+        'emerald_green' => '#10B981',
+        'primary' => '#064E3B',
+        'secondary' => '#10B981',
+    ],
 
     /*
     |--------------------------------------------------------------------------

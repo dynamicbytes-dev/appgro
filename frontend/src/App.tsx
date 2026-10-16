@@ -16,6 +16,7 @@ import { AdminSubordinatesView } from './pages/admin/AdminSubordinatesView';
 import { AdminActivitiesView } from './pages/admin/AdminActivitiesView';
 import { MyActivitiesView } from './pages/MyActivitiesView';
 import { InventoryView } from './pages/inventory/InventoryView';
+import { AnalyticsView } from './pages/analytics/AnalyticsView';
 import { HistoryView } from './pages/HistoryView';
 import { SpeciesView } from './pages/SpeciesView';
 import { GalponesView } from './pages/GalponesView';
@@ -187,6 +188,26 @@ export const App: React.FC = () => {
                       element={
                         <ModuleGuard moduleCode="inventario">
                           <InventoryView />
+                        </ModuleGuard>
+                      }
+                    />
+
+                    {/* Analítica y Reportes Module Dedicated Routes */}
+                    <Route path="/analytics" element={<AnalyticsView />} />
+                    <Route path="/admin/analytics" element={<AnalyticsView />} />
+                    <Route
+                      path="/modules/analitica"
+                      element={
+                        <ModuleGuard moduleCode="analitica">
+                          <AnalyticsView />
+                        </ModuleGuard>
+                      }
+                    />
+                    <Route
+                      path="/modules/analytics"
+                      element={
+                        <ModuleGuard moduleCode="analitica">
+                          <AnalyticsView />
                         </ModuleGuard>
                       }
                     />

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
+import { ZootikaLogo } from '../components/common/ZootikaLogo';
 import { ArrowRight, Lock, Mail, AlertCircle, ShieldCheck } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
@@ -40,14 +41,17 @@ export const LoginPage: React.FC = () => {
         
         {/* Header Branding */}
         <div className="bg-[#1B4D3E] p-8 text-center text-white relative">
-          <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-tr from-[#4E9F3D] to-[#6DBF5C] p-3 flex items-center justify-center shadow-lg border border-white/20">
-            <span className="text-3xl font-extrabold text-white">AG</span>
+          <div className="flex justify-center mb-3">
+            <ZootikaLogo size="xl" showText={false} />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white">
-            Appgro Multi-Granja
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            Bienvenido a Zootika
           </h1>
-          <p className="text-xs text-emerald-200 mt-1">
-            Plataforma Integral de Control y Gestión Agropecuaria
+          <div className="inline-flex items-center gap-1.5 mt-2 px-3 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
+            <span>Plataforma Multigranja</span>
+          </div>
+          <p className="text-xs text-emerald-200/80 mt-2">
+            Sistema de Gestión Agropecuaria Integral
           </p>
         </div>
 

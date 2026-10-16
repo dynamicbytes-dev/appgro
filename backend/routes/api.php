@@ -2,12 +2,15 @@
 
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AppConfigController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BarnController;
 use App\Http\Controllers\GalponController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryLotController;
 use App\Http\Controllers\InventoryMovementController;
 use App\Http\Controllers\InventorySupplierController;
 use App\Http\Controllers\InventoryWarehouseController;
@@ -27,6 +30,12 @@ use Illuminate\Support\Facades\Route;
 */
 
 $registerRoutes = function () {
+    // Public application metadata and configuration routes
+    Route::get('config', [AppConfigController::class, 'index']);
+    Route::get('metadata', [AppConfigController::class, 'index']);
+    Route::get('settings', [AppConfigController::class, 'index']);
+    Route::get('app-info', [AppConfigController::class, 'index']);
+
     // Public authentication routes
     Route::prefix('auth')->group(function () {
         Route::post('login', [AuthController::class, 'login']);
@@ -311,6 +320,13 @@ $registerRoutes = function () {
             Route::patch('warehouses/{id}', [InventoryWarehouseController::class, 'update']);
             Route::delete('warehouses/{id}', [InventoryWarehouseController::class, 'destroy']);
 
+            // Lotes de insumos (catálogo propio de Inventario)
+            Route::get('lots', [InventoryLotController::class, 'index']);
+            Route::post('lots', [InventoryLotController::class, 'store']);
+            Route::put('lots/{id}', [InventoryLotController::class, 'update']);
+            Route::patch('lots/{id}', [InventoryLotController::class, 'update']);
+            Route::delete('lots/{id}', [InventoryLotController::class, 'destroy']);
+
             Route::get('/', [InventoryController::class, 'index']);
             Route::post('/', [InventoryController::class, 'store']);
             Route::get('{id}', [InventoryController::class, 'show']);
@@ -342,6 +358,14 @@ $registerRoutes = function () {
             Route::put('warehouses/{id}', [InventoryWarehouseController::class, 'update']);
             Route::patch('warehouses/{id}', [InventoryWarehouseController::class, 'update']);
             Route::delete('warehouses/{id}', [InventoryWarehouseController::class, 'destroy']);
+
+            // Lotes de insumos (catálogo propio de Inventario)
+            Route::get('lots', [InventoryLotController::class, 'index']);
+            Route::post('lots', [InventoryLotController::class, 'store']);
+            Route::put('lots/{id}', [InventoryLotController::class, 'update']);
+            Route::patch('lots/{id}', [InventoryLotController::class, 'update']);
+            Route::delete('lots/{id}', [InventoryLotController::class, 'destroy']);
+
             Route::get('/', [InventoryController::class, 'index']);
             Route::post('/', [InventoryController::class, 'store']);
             Route::get('{id}', [InventoryController::class, 'show']);
@@ -379,6 +403,26 @@ $registerRoutes = function () {
         Route::middleware('module.access:history')->get('admin/activity-logs/stats', [ActivityLogController::class, 'stats']);
         Route::middleware('module.access:history')->get('admin/activity-logs/summary', [ActivityLogController::class, 'stats']);
         Route::middleware('module.access:history')->get('admin/activity-logs', [ActivityLogController::class, 'index']);
+
+        // Analítica y Reportes Module ('analytics' / alias 'analitica')
+        Route::middleware('module.access:analytics')->prefix('analytics')->group(function () {
+            Route::get('summary', [AnalyticsController::class, 'summary']);
+            Route::get('financial', [AnalyticsController::class, 'financial']);
+            Route::get('operations', [AnalyticsController::class, 'operations']);
+            Route::get('staff', [AnalyticsController::class, 'staff']);
+        });
+        Route::middleware('module.access:analytics')->get('admin/analytics/summary', [AnalyticsController::class, 'summary']);
+        Route::middleware('module.access:analytics')->get('admin/analytics/financial', [AnalyticsController::class, 'financial']);
+        Route::middleware('module.access:analytics')->get('admin/analytics/operations', [AnalyticsController::class, 'operations']);
+        Route::middleware('module.access:analytics')->get('admin/analytics/staff', [AnalyticsController::class, 'staff']);
+
+        // Alias 'analitica' para compatibilidad con el frontend
+        Route::middleware('module.access:analytics')->prefix('analitica')->group(function () {
+            Route::get('summary', [AnalyticsController::class, 'summary']);
+            Route::get('financial', [AnalyticsController::class, 'financial']);
+            Route::get('operations', [AnalyticsController::class, 'operations']);
+            Route::get('staff', [AnalyticsController::class, 'staff']);
+        });
 
     });
 };

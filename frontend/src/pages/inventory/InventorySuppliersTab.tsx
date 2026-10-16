@@ -95,9 +95,11 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
   }, [loadSuppliers]);
 
   const filtered = useMemo(() => {
+    const list = Array.isArray(suppliers) ? suppliers : [];
     const term = searchTerm.trim().toLowerCase();
 
-    return suppliers.filter((supplier) => {
+    return list.filter((supplier) => {
+      if (!supplier) return false;
       const matchesSearch =
         !term ||
         safeText(supplier.name, '').toLowerCase().includes(term) ||
@@ -258,17 +260,17 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
 
       {/* Tabla */}
       <Card className="overflow-hidden p-0!">
-        {errorMessage && (
+        {errorMessage ? (
           <div className="m-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-gray-400">
             <RefreshCw className="w-6 h-6 animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : (filtered || []).length === 0 ? (
           <div className="py-16 text-center text-gray-400 dark:text-gray-500">
             <Truck className="w-10 h-10 mx-auto mb-3 opacity-40" />
             <p className="font-semibold">No hay proveedores registrados.</p>
@@ -289,29 +291,29 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                   <th className="px-4 py-3 font-bold">Dirección</th>
                   <th className="px-4 py-3 font-bold">Insumos</th>
                   <th className="px-4 py-3 font-bold">Estado</th>
-                  {isAdmin && <th className="px-4 py-3 font-bold text-right">Acciones</th>}
+                  {isAdmin ? <th className="px-4 py-3 font-bold text-right">Acciones</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#263632]">
-                {filtered.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
+                {(filtered || []).map((supplier) => (
+                  <tr key={`supplier-${supplier.id}`} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
                     <td className="px-4 py-3 max-w-[240px]">
                       <p className="font-semibold text-sm text-[#1E1E1E] dark:text-gray-100 truncate">
                         {safeText(supplier.name, `Proveedor #${supplier.id}`)}
                       </p>
-                      {supplier.tax_id && (
+                      {supplier.tax_id ? (
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           RUC/ID: {safeText(supplier.tax_id, '')}
                         </p>
-                      )}
+                      ) : null}
                     </td>
                     <td className="px-4 py-3">
                       <p className="text-xs text-gray-700 dark:text-gray-200">
                         {safeText(supplier.contact_name ?? '', '—')}
                       </p>
-                      {supplier.phone && (
+                      {supplier.phone ? (
                         <p className="text-[11px] text-gray-500 dark:text-gray-400">{safeText(supplier.phone, '')}</p>
-                      )}
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-200">
                       {safeText(supplier.email ?? '', '—')}
@@ -327,10 +329,11 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                         {supplier.is_active ? 'Activo' : 'Inactivo'}
                       </Badge>
                     </td>
-                    {isAdmin && (
+                    {isAdmin ? (
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            type="button"
                             onClick={() => openEditModal(supplier)}
                             className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                             title="Editar proveedor"
@@ -338,6 +341,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
+                            type="button"
                             onClick={() => {
                               setSelected(supplier);
                               setIsDeleteModalOpen(true);
@@ -349,7 +353,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                           </button>
                         </div>
                       </td>
-                    )}
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -379,7 +383,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                 placeholder="Ej: Distribuidora del Norte"
                 className={inputClasses}
               />
-              {formErrors.name && <p className="text-xs text-red-600 mt-1">{formErrors.name}</p>}
+              {formErrors.name ? <p className="text-xs text-red-600 mt-1">{formErrors.name}</p> : null}
             </div>
 
             <div>
@@ -393,7 +397,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                 placeholder="Ej: 1790012345001"
                 className={inputClasses}
               />
-              {formErrors.tax_id && <p className="text-xs text-red-600 mt-1">{formErrors.tax_id}</p>}
+              {formErrors.tax_id ? <p className="text-xs text-red-600 mt-1">{formErrors.tax_id}</p> : null}
             </div>
           </div>
 
@@ -437,7 +441,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                 placeholder="Ej: ventas@proveedor.com"
                 className={inputClasses}
               />
-              {formErrors.email && <p className="text-xs text-red-600 mt-1">{formErrors.email}</p>}
+              {formErrors.email ? <p className="text-xs text-red-600 mt-1">{formErrors.email}</p> : null}
             </div>
 
             <div>
@@ -509,9 +513,9 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
               <XCircle className="w-5 h-5 text-red-600" />
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-200">
-              ¿Seguro que deseas eliminar el proveedor{' '}
-              <span className="font-semibold">«{safeText(selected?.name, '')}»</span>? Los insumos que lo tengan
-              asignado quedarán sin proveedor.
+              <span>¿Seguro que deseas eliminar el proveedor </span>
+              <span className="font-semibold">«{safeText(selected?.name, '')}»</span>
+              <span>? Los insumos que lo tengan asignado quedarán sin proveedor.</span>
             </p>
           </div>
 

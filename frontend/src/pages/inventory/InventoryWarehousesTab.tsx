@@ -91,9 +91,11 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
   }, [loadWarehouses]);
 
   const filtered = useMemo(() => {
+    const list = Array.isArray(warehouses) ? warehouses : [];
     const term = searchTerm.trim().toLowerCase();
 
-    return warehouses.filter((warehouse) => {
+    return list.filter((warehouse) => {
+      if (!warehouse) return false;
       const matchesSearch =
         !term ||
         safeText(warehouse.name, '').toLowerCase().includes(term) ||
@@ -247,17 +249,17 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
 
       {/* Tabla */}
       <Card className="overflow-hidden p-0!">
-        {errorMessage && (
+        {errorMessage ? (
           <div className="m-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
             {errorMessage}
           </div>
-        )}
+        ) : null}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-gray-400">
             <RefreshCw className="w-6 h-6 animate-spin" />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : (filtered || []).length === 0 ? (
           <div className="py-16 text-center text-gray-400 dark:text-gray-500">
             <Warehouse className="w-10 h-10 mx-auto mb-3 opacity-40" />
             <p className="font-semibold">No hay bodegas registradas.</p>
@@ -277,21 +279,21 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
                   <th className="px-4 py-3 font-bold">Dirección</th>
                   <th className="px-4 py-3 font-bold">Insumos</th>
                   <th className="px-4 py-3 font-bold">Estado</th>
-                  {isAdmin && <th className="px-4 py-3 font-bold text-right">Acciones</th>}
+                  {isAdmin ? <th className="px-4 py-3 font-bold text-right">Acciones</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#263632]">
-                {filtered.map((warehouse) => (
-                  <tr key={warehouse.id} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
+                {(filtered || []).map((warehouse) => (
+                  <tr key={`warehouse-${warehouse.id}`} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
                     <td className="px-4 py-3 max-w-[240px]">
                       <p className="font-semibold text-sm text-[#1E1E1E] dark:text-gray-100 truncate">
                         {safeText(warehouse.name, `Bodega #${warehouse.id}`)}
                       </p>
-                      {warehouse.code && (
+                      {warehouse.code ? (
                         <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                           Código: {safeText(warehouse.code, '')}
                         </p>
-                      )}
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-200">
                       {safeText(warehouse.manager_name ?? '', '—')}
@@ -307,10 +309,11 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
                         {warehouse.is_active ? 'Activa' : 'Inactiva'}
                       </Badge>
                     </td>
-                    {isAdmin && (
+                    {isAdmin ? (
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
+                            type="button"
                             onClick={() => openEditModal(warehouse)}
                             className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                             title="Editar bodega"
@@ -318,6 +321,7 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
+                            type="button"
                             onClick={() => {
                               setSelected(warehouse);
                               setIsDeleteModalOpen(true);
@@ -329,7 +333,7 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
                           </button>
                         </div>
                       </td>
-                    )}
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -359,7 +363,7 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
                 placeholder="Ej: Bodega Central"
                 className={inputClasses}
               />
-              {formErrors.name && <p className="text-xs text-red-600 mt-1">{formErrors.name}</p>}
+              {formErrors.name ? <p className="text-xs text-red-600 mt-1">{formErrors.name}</p> : null}
             </div>
 
             <div>
@@ -373,7 +377,7 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
                 placeholder="Ej: BOD-01"
                 className={inputClasses}
               />
-              {formErrors.code && <p className="text-xs text-red-600 mt-1">{formErrors.code}</p>}
+              {formErrors.code ? <p className="text-xs text-red-600 mt-1">{formErrors.code}</p> : null}
             </div>
           </div>
 
@@ -458,9 +462,9 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
               <XCircle className="w-5 h-5 text-red-600" />
             </div>
             <p className="text-sm text-gray-700 dark:text-gray-200">
-              ¿Seguro que deseas eliminar la bodega{' '}
-              <span className="font-semibold">«{safeText(selected?.name, '')}»</span>? Los insumos almacenados allí
-              quedarán sin bodega asignada.
+              <span>¿Seguro que deseas eliminar la bodega </span>
+              <span className="font-semibold">«{safeText(selected?.name, '')}»</span>
+              <span>? Los insumos almacenados allí quedarán sin bodega asignada.</span>
             </p>
           </div>
 

@@ -44,6 +44,7 @@ import { GalponesView } from './GalponesView';
 import { LotesView } from './LotesView';
 import { AdminActivitiesView } from './admin/AdminActivitiesView';
 import { InventoryView } from './inventory/InventoryView';
+import { AnalyticsView } from './analytics/AnalyticsView';
 
 interface ModuleRecord {
   id: string;
@@ -110,6 +111,10 @@ export const ModulePage: React.FC = () => {
     (moduleId as string) === 'actividades' || (moduleId as string) === 'activities';
   const isInventory =
     (moduleId as string) === 'inventario' || (moduleId as string) === 'inventory';
+  const isAnalytics =
+    (moduleId as string) === 'analitica' ||
+    (moduleId as string) === 'analytics' ||
+    (moduleId as string) === 'analytic';
 
   // Dynamic records state for current module
   // (los hooks deben ejecutarse antes de cualquier early-return)
@@ -144,6 +149,11 @@ export const ModulePage: React.FC = () => {
   // El módulo de inventario consume la API real (no el genérico en memoria)
   if (isInventory) {
     return <InventoryView />;
+  }
+
+  // El módulo de analítica consume la API real (no el genérico en memoria)
+  if (isAnalytics) {
+    return <AnalyticsView />;
   }
 
   const modConfig = moduleId ? SYSTEM_MODULES[moduleId] : null;

@@ -324,12 +324,14 @@ export const LotesView: React.FC = () => {
   const [formSpeciesId, setFormSpeciesId] = useState<string>('');
   const [formQuantity, setFormQuantity] = useState<string>('');
   const [formFarmId, setFormFarmId] = useState<string>('');
+  const [formInvestmentCost, setFormInvestmentCost] = useState<string>('');
   const [animalForms, setAnimalForms] = useState<AnimalFormState[]>([]);
 
   /* --------------------- Formulario: Editar Lote -------------------- */
   const [editQuantity, setEditQuantity] = useState<string>('');
   const [editPurpose, setEditPurpose] = useState<string>('');
   const [editStatus, setEditStatus] = useState<string>('activo');
+  const [editInvestmentCost, setEditInvestmentCost] = useState<string>('');
 
   /* --------------------- Formulario: Cosecha ------------------------ */
   const [harvestAvgWeight, setHarvestAvgWeight] = useState<string>('');
@@ -602,6 +604,7 @@ export const LotesView: React.FC = () => {
     setFormSpeciesId('');
     setFormQuantity('');
     setFormFarmId(isRoot ? (selectedRootFarmId && selectedRootFarmId !== 'all' ? selectedRootFarmId : '') : '');
+    setFormInvestmentCost('');
     setAnimalForms([]);
     // Un lote manual no consume los destetes pendientes
     setWeanedSourceIds([]);
@@ -650,6 +653,11 @@ export const LotesView: React.FC = () => {
         quantity: quantityNum,
         purpose: formPurpose || undefined,
         farm_id: payloadFarmId,
+        // Costo de inversión en animales (opcional)
+        investment_cost:
+          formInvestmentCost.trim() !== '' && !Number.isNaN(Number(formInvestmentCost))
+            ? Number(formInvestmentCost)
+            : undefined,
         // Lote de lechones destetados: vincula los destetes
         // pendientes (el backend valida la cantidad exacta de
         // vivos y los marca como resueltos en BD)
@@ -718,6 +726,11 @@ export const LotesView: React.FC = () => {
     setEditQuantity(String(lot.quantity || 0));
     setEditPurpose(lot.purpose || '');
     setEditStatus(lot.status === 'inactivo' ? 'inactivo' : 'activo');
+    setEditInvestmentCost(
+      lot.investment_cost !== null && lot.investment_cost !== undefined
+        ? String(lot.investment_cost)
+        : ''
+    );
     setErrorMessage(null);
     setIsEditModalOpen(true);
   };
@@ -737,6 +750,13 @@ export const LotesView: React.FC = () => {
         quantity: qty,
         purpose: editPurpose.trim() || undefined,
         status: editStatus as 'activo' | 'inactivo',
+        // `null` limpia el costo de inversión; número lo actualiza.
+        investment_cost:
+          editInvestmentCost.trim() === ''
+            ? null
+            : Number.isNaN(Number(editInvestmentCost))
+            ? null
+            : Number(editInvestmentCost),
       });
       setLotsList((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)));
       setIsEditModalOpen(false);
@@ -2288,6 +2308,25 @@ export const LotesView: React.FC = () => {
             </div>
           )}
 
+          {/* Costo de inversión en animales (opcional) */}
+          <div className="col-span-1 md:col-span-2">
+            <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
+              Costo de Inversión en Animales <span className="text-gray-400 font-medium normal-case">(opcional)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Ej. 1500.00 — valor de compra del lote"
+              value={formInvestmentCost}
+              onChange={(e) => setFormInvestmentCost(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">
+              Se usa en Analítica para calcular el costo total de producción del lote. Si se deja vacío, el lote se excluye de los totales de inversión.
+            </p>
+          </div>
+
           {/* Formularios individuales por animal (Porcino + Reproducción) */}
           {isReproductionForm && shownAnimalForms > 0 && (
             <div className="col-span-1 md:col-span-2">
@@ -2581,6 +2620,24 @@ export const LotesView: React.FC = () => {
                 placeholder="Ej. Carne, Huevos, Reproducción"
                 className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
               />
+            </div>
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
+                Costo de Inversión en Animales
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ej. 1500.00 — dejar vacío para limpiar"
+                value={editInvestmentCost}
+                onChange={(e) => setEditInvestmentCost(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">
+                Valor de adquisición del lote. Dejarlo vacío elimina el costo de inversión registrado.
+              </p>
             </div>
 
             <div className="col-span-1 md:col-span-2">

@@ -168,6 +168,7 @@ export interface InventoryMovement {
   resulting_stock: string | number;
   stock_effect?: number;
   destination_lot_id: number | null;
+  inventory_lot_id?: number | null;
   notes: string | null;
   movement_date: string;
   user_id: number | null;
@@ -177,9 +178,12 @@ export interface InventoryMovement {
   unit?: string | null;
   unit_short?: string | null;
   lot_code?: string | null;
+  inventory_lot_code?: string | null;
+  inventory_lot_label?: string | null;
   responsible_name?: string | null;
   item?: { id: number; code: string; name: string; unit?: string } | null;
   lot?: { id: number; code: string } | null;
+  inventory_lot?: { id: number; code: string; expiration_date?: string | null } | null;
   user?: InventoryUser | null;
 }
 
@@ -256,6 +260,7 @@ export interface CreateInventoryMovementDTO {
   type: InventoryMovementType;
   quantity: number;
   destination_lot_id?: number | null;
+  inventory_lot_id?: number | null;
   notes?: string | null;
 }
 
@@ -263,6 +268,7 @@ export interface InventoryMovementFilters {
   type?: string;
   inventory_item_id?: number | string;
   destination_lot_id?: number | string;
+  inventory_lot_id?: number | string;
   from?: string;
   to?: string;
   farm_id?: number | string;
@@ -335,3 +341,47 @@ export interface CreateInventoryWarehouseDTO {
 }
 
 export type UpdateInventoryWarehouseDTO = Partial<CreateInventoryWarehouseDTO>;
+
+/* ------------------------------------------------------------------ */
+/* Catálogo: lotes de insumos                                          */
+/* ------------------------------------------------------------------ */
+
+export interface InventoryLot {
+  id: number;
+  farm_id: number;
+  inventory_item_id: number | null;
+  code: string;
+  supplier_id: number | null;
+  manufacturing_date: string | null;
+  expiration_date: string | null;
+  notes: string | null;
+  label?: string;
+  item_code?: string | null;
+  item_name?: string | null;
+  item_unit?: string | null;
+  supplier_name?: string | null;
+  is_expired?: boolean;
+  is_expiring_soon?: boolean;
+  created_at?: string;
+  updated_at?: string | null;
+  creator?: InventoryUser | null;
+}
+
+export interface InventoryLotFilters {
+  search?: string;
+  inventory_item_id?: number | string;
+  farm_id?: number | string;
+}
+
+export interface CreateInventoryLotDTO {
+  /** Si se omite, el backend genera un código LOTE-XXXXX. */
+  code?: string | null;
+  inventory_item_id?: number | null;
+  supplier_id?: number | null;
+  manufacturing_date?: string | null;
+  expiration_date?: string | null;
+  notes?: string | null;
+  farm_id?: number | string;
+}
+
+export type UpdateInventoryLotDTO = Partial<CreateInventoryLotDTO>;

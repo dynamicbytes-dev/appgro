@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ProfileModal } from './ProfileModal';
 import { NotificationBell } from './NotificationBell';
+import { ZootikaLogo } from './ZootikaLogo';
 import { safeText } from '../../utils/safeText';
 import {
   LogOut,
@@ -48,23 +49,8 @@ export const Navbar: React.FC = () => {
     <header className="bg-[#1B4D3E] text-white shadow-lg sticky top-0 z-40 border-b border-[#256653]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
-        {/* Brand Logo & Name */}
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#4E9F3D] to-[#6DBF5C] p-2 flex items-center justify-center shadow-md border border-[#6DBF5C]/30">
-            <span className="text-xl font-bold tracking-tight text-white">AG</span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-lg tracking-wide text-white">Appgro</span>
-              <span className="text-xs bg-[#4E9F3D] text-white px-2 py-0.5 rounded-full font-semibold">
-                Multi-Granja
-              </span>
-            </div>
-            <p className="text-xs text-emerald-200/80 hidden sm:block">
-              Sistema de Gestión Agropecuaria Integral
-            </p>
-          </div>
-        </div>
+        {/* Official Brand Logo & Name */}
+        <ZootikaLogo size="md" showText={true} textVariant="light" />
 
         {/* Center: Farm Selector for Root */}
         {isRoot && farms && farms.length > 0 && (

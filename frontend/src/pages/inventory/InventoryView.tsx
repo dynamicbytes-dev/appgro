@@ -52,9 +52,9 @@ export const InventoryView: React.FC = () => {
 
         {/* Pestañas */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {TABS.map((tab) => (
+          {(TABS || []).map((tab) => (
             <button
-              key={tab.id}
+              key={`inv-tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold border transition-colors ${
                 activeTab === tab.id
@@ -63,18 +63,26 @@ export const InventoryView: React.FC = () => {
               }`}
             >
               {tab.icon}
-              {tab.label}
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Contenido de la pestaña activa (se remonta para refrescar datos) */}
-      {activeTab === 'items' && <InventoryItemsTab key="items" isAdmin={isAdmin} />}
-      {activeTab === 'movements' && <InventoryMovementsTab key="movements" isAdmin={isAdmin} />}
-      {activeTab === 'suppliers' && <InventorySuppliersTab key="suppliers" isAdmin={isAdmin} />}
-      {activeTab === 'warehouses' && <InventoryWarehousesTab key="warehouses" isAdmin={isAdmin} />}
-      {activeTab === 'panel' && <InventoryPanelTab key="panel" isAdmin={isAdmin} />}
+      {/* Contenido de la pestaña activa protegido en contenedor único sin nodos huérfanos */}
+      <div className="w-full">
+        {activeTab === 'items' ? (
+          <InventoryItemsTab key="tab-items" isAdmin={isAdmin} />
+        ) : activeTab === 'movements' ? (
+          <InventoryMovementsTab key="tab-movements" isAdmin={isAdmin} />
+        ) : activeTab === 'suppliers' ? (
+          <InventorySuppliersTab key="tab-suppliers" isAdmin={isAdmin} />
+        ) : activeTab === 'warehouses' ? (
+          <InventoryWarehousesTab key="tab-warehouses" isAdmin={isAdmin} />
+        ) : activeTab === 'panel' ? (
+          <InventoryPanelTab key="tab-panel" isAdmin={isAdmin} />
+        ) : null}
+      </div>
     </div>
   );
 };

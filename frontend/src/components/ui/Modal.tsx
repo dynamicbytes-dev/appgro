@@ -115,6 +115,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   const modalContent = (
     <div
+      translate="no"
       className={`fixed inset-0 overflow-y-auto flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs transition-opacity duration-200 ${
         visible ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}

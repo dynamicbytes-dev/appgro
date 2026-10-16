@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\InventoryItem;
+use App\Models\InventoryLot;
 use App\Models\InventoryMovement;
 use App\Models\Lot;
 use Illuminate\Http\Request;
@@ -39,6 +40,7 @@ class InventoryMovementController extends Controller
         $query = InventoryMovement::query()->with([
             'item:id,code,name,unit',
             'lot:id,code',
+            'inventoryLot:id,code,expiration_date',
             'user:id,name,lastname',
         ]);
 
@@ -72,6 +74,10 @@ class InventoryMovementController extends Controller
 
         if ($request->filled('destination_lot_id')) {
             $query->where('destination_lot_id', (int) $request->destination_lot_id);
+        }
+
+        if ($request->filled('inventory_lot_id')) {
+            $query->where('inventory_lot_id', (int) $request->inventory_lot_id);
         }
 
         if ($request->filled('from')) {
@@ -122,6 +128,7 @@ class InventoryMovementController extends Controller
             'type' => ['required', Rule::in(array_keys(InventoryMovement::TYPE_LABELS))],
             'quantity' => ['required', 'numeric'],
             'destination_lot_id' => ['nullable', 'integer', 'exists:lots,id'],
+            'inventory_lot_id' => ['nullable', 'integer', 'exists:inventory_lots,id'],
             'notes' => ['nullable', 'string'],
         ], [
             'inventory_item_id.required' => 'Debe seleccionar el insumo a mover.',
@@ -131,6 +138,7 @@ class InventoryMovementController extends Controller
             'quantity.required' => 'La cantidad es obligatoria.',
             'quantity.numeric' => 'La cantidad debe ser numérica.',
             'destination_lot_id.exists' => 'El lote de destino no existe.',
+            'inventory_lot_id.exists' => 'El lote de insumo seleccionado no existe.',
         ]);
 
         // El insumo debe pertenecer a la granja del usuario.
@@ -181,7 +189,7 @@ class InventoryMovementController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // El lote de destino debe pertenecer a la misma granja.
+        // El lote de destino (animales) debe pertenecer a la misma granja.
         $lotId = $request->filled('destination_lot_id') ? (int) $request->destination_lot_id : null;
 
         if ($lotId) {
@@ -198,16 +206,57 @@ class InventoryMovementController extends Controller
             }
         }
 
-        $movement = DB::transaction(function () use ($request, $item, $user, $lotId) {
+        // El lote de insumo solo aplica a las entradas y debe pertenecer a la
+        // misma granja (y al mismo insumo, o quedar libre para asignarse).
+        $inventoryLot = null;
+        $inventoryLotId = null;
+
+        if ($request->input('type') === InventoryMovement::TYPE_ENTRY && $request->filled('inventory_lot_id')) {
+            $inventoryLot = InventoryLot::withoutGlobalScopes()->find((int) $request->inventory_lot_id);
+
+            if (! $inventoryLot || (int) $inventoryLot->farm_id !== (int) $item->farm_id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Error de validación de datos.',
+                    'errors' => [
+                        'inventory_lot_id' => ['El lote de insumo pertenece a otra granja.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if ($inventoryLot->inventory_item_id !== null
+                && (int) $inventoryLot->inventory_item_id !== (int) $item->id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Error de validación de datos.',
+                    'errors' => [
+                        'inventory_lot_id' => ['El lote de insumo corresponde a otro insumo.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            // Un lote libre se asigna al insumo al usarse (dentro de la
+            // transacción del movimiento, más abajo).
+            $inventoryLotId = (int) $inventoryLot->id;
+        }
+
+        $movement = DB::transaction(function () use ($request, $item, $user, $lotId, $inventoryLot, $inventoryLotId) {
+            if ($inventoryLot && $inventoryLot->inventory_item_id === null) {
+                $inventoryLot->inventory_item_id = $item->id;
+                $inventoryLot->save();
+            }
+
             return InventoryMovement::applyMovement($item, [
                 'type' => $request->type,
                 'quantity' => (float) $request->quantity,
                 'destination_lot_id' => $lotId,
+                'inventory_lot_id' => $inventoryLotId,
+                'inventory_lot' => $inventoryLot,
                 'notes' => $request->filled('notes') ? trim($request->notes) : null,
             ], (int) $user->id);
         });
 
-        $movement->load(['item:id,code,name,unit', 'lot:id,code', 'user:id,name,lastname']);
+        $movement->load(['item:id,code,name,unit', 'lot:id,code', 'inventoryLot:id,code,expiration_date', 'user:id,name,lastname']);
 
         return response()->json([
             'status' => 'success',
@@ -230,6 +279,9 @@ class InventoryMovementController extends Controller
             'unit' => $movement->item?->unit,
             'unit_short' => $movement->item?->unitShort(),
             'lot_code' => $movement->lot?->code,
+            'inventory_lot_id' => $movement->inventory_lot_id,
+            'inventory_lot_code' => $movement->inventoryLot?->code,
+            'inventory_lot_label' => $movement->inventoryLot?->label(),
             'responsible_name' => $movement->user
                 ? trim(($movement->user->name ?? '').' '.($movement->user->lastname ?? ''))
                 : null,

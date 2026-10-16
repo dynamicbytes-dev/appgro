@@ -59,6 +59,36 @@ export const SYSTEM_MODULES: Record<ModuleId, ModuleConfig> = {
   },
 };
 
+/**
+ * Orden canónico de aparición de los módulos en la barra lateral.
+ *
+ * Se usa para ordenar la lista de módulos habilitados, cuyo orden de
+ * origen no está garantizado: el root itera las claves de
+ * `SYSTEM_MODULES` y los demás roles reciben el arreglo `enabledModules`
+ * desde la API (orden de la base de datos). El orden solicitado para los
+ * "Módulos Agropecuarios Operativos" es:
+ *
+ *  1. Especies
+ *  2. Galpones
+ *  3. Lotes
+ *  4. Inventario
+ *  5. Actividades
+ *  6. Analítica
+ *
+ * `historial` se mantiene al final: para admin y root se muestra en su
+ * bloque administrativo, y para el encargado se conserva como último
+ * elemento operativo (comportamiento previo).
+ */
+export const MODULE_DISPLAY_ORDER: ModuleId[] = [
+  "especies",
+  "galpones",
+  "lotes",
+  "inventario",
+  "actividades",
+  "analitica",
+  "historial",
+];
+
 export const MODULE_ALIAS_MAP: Record<string, ModuleId> = {
   // English backend codes mapped to canonical Spanish keys
   species: "especies",

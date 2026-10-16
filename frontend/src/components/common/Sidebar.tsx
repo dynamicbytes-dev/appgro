@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth, extractEnabledModules } from '../../context/AuthContext';
-import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled } from '../../config/modules';
+import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled, MODULE_DISPLAY_ORDER } from '../../config/modules';
 import { safeText } from '../../utils/safeText';
 import type { ModuleId } from '../../types/auth';
 import {
@@ -51,7 +51,17 @@ export const Sidebar: React.FC = () => {
         .map(normalizeModuleCode)
         .filter((m): m is ModuleId => m !== null && m in SYSTEM_MODULES);
 
-  const userModules = Array.from(new Set(rawUserModules));
+  // Orden estricto solicitado para los módulos operativos en la barra
+  // lateral, independiente del orden que devuelva la API o del orden de
+  // las claves de `SYSTEM_MODULES`.
+  const moduleRank = (id: string): number => {
+    const index = (MODULE_DISPLAY_ORDER as string[]).indexOf(id);
+    return index === -1 ? MODULE_DISPLAY_ORDER.length : index;
+  };
+
+  const userModules = Array.from(new Set(rawUserModules)).sort(
+    (a, b) => moduleRank(a) - moduleRank(b)
+  );
 
   // Dynamic evaluation: is Historial module enabled for current user/farm?
   const isHistoryEnabled =

@@ -46,6 +46,7 @@ class InventoryMovement extends Model
         'quantity',
         'resulting_stock',
         'destination_lot_id',
+        'inventory_lot_id',
         'notes',
         'movement_date',
         'user_id',
@@ -57,6 +58,7 @@ class InventoryMovement extends Model
         'quantity' => 'decimal:2',
         'resulting_stock' => 'decimal:2',
         'destination_lot_id' => 'integer',
+        'inventory_lot_id' => 'integer',
         'user_id' => 'integer',
         'movement_date' => 'datetime',
         'created_at' => 'datetime',
@@ -99,6 +101,14 @@ class InventoryMovement extends Model
     public function lot()
     {
         return $this->belongsTo(Lot::class, 'destination_lot_id');
+    }
+
+    /**
+     * Lote de insumo (partida/recepción) asociado a una entrada.
+     */
+    public function inventoryLot()
+    {
+        return $this->belongsTo(InventoryLot::class, 'inventory_lot_id');
     }
 
     public function user()
@@ -147,7 +157,7 @@ class InventoryMovement extends Model
      * mínimo. Debe invocarse dentro de una transacción y tras validar
      * que el stock resultante no sea negativo.
      *
-     * @param  array{type: string, quantity: float|int|string, destination_lot_id?: int|null, notes?: string|null}  $data
+     * @param  array{type: string, quantity: float|int|string, destination_lot_id?: int|null, inventory_lot_id?: int|null, inventory_lot?: InventoryLot|null, notes?: string|null}  $data
      */
     public static function applyMovement(InventoryItem $item, array $data, int $userId): self
     {
@@ -158,9 +168,25 @@ class InventoryMovement extends Model
 
         $item->current_stock = $resultingStock;
 
-        // La entrada marca la última fecha de compra del insumo.
+        // La entrada marca la última fecha de compra del insumo y, cuando
+        // se recibe con un lote de insumo, sincroniza el lote/vencimiento
+        // vigentes del insumo con los del lote recibido.
         if ($type === self::TYPE_ENTRY) {
             $item->last_purchase_date = now()->toDateString();
+
+            $lot = $data['inventory_lot'] ?? null;
+
+            if ($lot instanceof InventoryLot) {
+                $item->batch_number = $lot->code;
+
+                if ($lot->manufacturing_date) {
+                    $item->manufacturing_date = $lot->manufacturing_date;
+                }
+
+                if ($lot->expiration_date) {
+                    $item->expiration_date = $lot->expiration_date;
+                }
+            }
         }
 
         $item->syncTotalCost();
@@ -173,6 +199,7 @@ class InventoryMovement extends Model
             'quantity' => $quantity,
             'resulting_stock' => $resultingStock,
             'destination_lot_id' => $data['destination_lot_id'] ?? null,
+            'inventory_lot_id' => $data['inventory_lot_id'] ?? null,
             'notes' => $data['notes'] ?? null,
             'movement_date' => now(),
             'user_id' => $userId,
