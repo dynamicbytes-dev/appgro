@@ -9,12 +9,11 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
-  FileText,
 } from 'lucide-react';
-import { pdfKpiGenerators } from '../../utils/pdfKpiGenerator';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { Badge } from '../../components/ui/Badge';
 import { inventoryService } from '../../services/inventoryService';
 import { safeText } from '../../utils/safeText';
@@ -128,37 +127,51 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
   return (
     <div className="space-y-6">
       <div className="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          onClick={() => {
-            pdfKpiGenerators.inventario({
-              farmName: activeFarm?.name,
-              kpis: [
-                { label: 'Insumos Totales', value: stats.total, status: 'info' },
-                { label: 'Valorización Inventario', value: formatMoney(stats.totalValue), status: 'success' },
-                { label: 'Bajo Mínimo', value: stats.low, status: stats.low > 0 ? 'danger' : 'success' },
-                { label: 'Sobre Stock', value: stats.over, status: 'warning' },
-                { label: 'Por Vencer', value: stats.expiring, status: stats.expiring > 0 ? 'warning' : 'success' },
-                { label: 'Vencidos', value: stats.expired, status: stats.expired > 0 ? 'danger' : 'success' },
-              ],
-              tables: [
-                {
-                  title: 'Resumen de Alertas Críticas de Inventario',
-                  headers: ['Tipo de Alerta', 'Cantidad de Artículos', 'Nivel de Riesgo'],
-                  rows: [
-                    ['Bajo Mínimo (Quiebre de Stock)', String(stats.low), stats.low > 0 ? 'Crítico' : 'Normal'],
-                    ['Sobre Stock (Exceso de Insumos)', String(stats.over), stats.over > 0 ? 'Atención' : 'Normal'],
-                    ['Próximos a Vencer (30 días)', String(stats.expiring), stats.expiring > 0 ? 'Alerta' : 'Normal'],
-                    ['Insumos Vencidos', String(stats.expired), stats.expired > 0 ? 'Inmovilizar' : 'Normal'],
-                  ],
-                },
-              ],
-            });
-          }}
-          icon={<FileText className="w-4 h-4" />}
-        >
-          Reporte PDF
-        </Button>
+        <ExportKpiPdfButton
+          moduleTitle="Módulo de Inventario e Insumos"
+          moduleSlug="inventario"
+          kpis={[
+            {
+              title: 'Insumos Totales',
+              value: stats.total,
+              subtitle: 'Catálogo registrado',
+              tone: 'slate',
+            },
+            {
+              title: 'Valorización',
+              value: formatMoney(stats.totalValue),
+              subtitle: 'Capital en bodega',
+              tone: 'emerald',
+            },
+            {
+              title: 'Stock Crítico',
+              value: stats.low,
+              subtitle: 'Insumos bajo mínimo',
+              tone: stats.low > 0 ? 'red' : 'emerald',
+            },
+            {
+              title: 'Vencimientos',
+              value: `${stats.expiring} / ${stats.expired}`,
+              subtitle: 'Por vencer / Vencidos',
+              tone: stats.expired > 0 ? 'red' : stats.expiring > 0 ? 'amber' : 'emerald',
+            },
+          ]}
+          diagnosis={
+            stats.low > 0 || stats.expired > 0
+              ? 'Atención: Existen insumos bajo stock crítico o con fecha de caducidad superada. Se requiere reposición de quiebres e inmovilización de lotes caducados para preservar la bioseguridad agropecuaria.'
+              : 'Salud de inventario óptima: Los niveles de insumos se encuentran dentro de las bandas de reposición y no se registran pérdidas por caducidad.'
+          }
+          columns={['Insumo', 'Categoría', 'Stock Actual', 'Mínimo', 'Costo Unit.', 'Valor Total', 'Alertas']}
+          rows={(Array.isArray(items) ? items : []).map((item) => [
+            item.name || '-',
+            typeof item.category === 'object' && item.category !== null ? (item.category as any).name || 'General' : (item.category || 'General'),
+            formatQtyWithUnit(item.current_stock, item.unit),
+            formatQtyWithUnit(item.min_stock, item.unit),
+            formatMoney(item.unit_cost),
+            formatMoney(item.total_cost),
+            (item.alert_flags || []).join(', ') || 'Normal',
+          ])}
+        />
         <Button variant="outline" onClick={() => void loadPanel()} icon={<RefreshCw className="w-4 h-4" />}>
           Actualizar
         </Button>

@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { inventoryService } from '../../services/inventoryService';
@@ -366,11 +367,72 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
               </Button>
             </div>
 
-            {isAdmin ? (
-              <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
-                Nuevo Insumo
-              </Button>
-            ) : null}
+            <div className="flex items-center gap-2">
+              <ExportKpiPdfButton
+                moduleTitle="Módulo de Inventario de Insumos"
+                moduleSlug="inventario"
+                kpis={[
+                  {
+                    title: 'Total Insumos',
+                    value: stats?.total_items ?? (items || []).length,
+                    subtitle: 'Registros en catálogo',
+                    tone: 'slate',
+                  },
+                  {
+                    title: 'Valoración Total',
+                    value: formatMoney(
+                      stats?.total_value ?? (items || []).reduce((s, i) => s + toNumber(i?.total_cost), 0)
+                    ),
+                    subtitle: 'Capital en bodega',
+                    tone: 'emerald',
+                  },
+                  {
+                    title: 'Alertas de Stock',
+                    value: `${stats?.low_stock ?? 0} bajo mín. / ${stats?.expiring ?? 0} por vencer`,
+                    subtitle: (stats?.low_stock ?? 0) > 0 ? 'Quiebre de stock crítico' : 'Stock en rango seguro',
+                    tone: (stats?.low_stock ?? 0) > 0 ? 'red' : (stats?.expiring ?? 0) > 0 ? 'amber' : 'emerald',
+                  },
+                  {
+                    title: 'Lotes Activos',
+                    value: `${(items || []).filter((i) => Boolean(i?.batch_number)).length} lotes`,
+                    subtitle: 'Insumos con lote trazable',
+                    tone: 'slate',
+                  },
+                ]}
+                diagnosis={
+                  (stats?.low_stock ?? 0) > 0 || (stats?.expiring ?? 0) > 0
+                    ? `Atención de inventario: Se detectan ${stats?.low_stock ?? 0} insumos bajo stock mínimo y ${stats?.expiring ?? 0} próximos a vencer. Se recomienda tramitar órdenes de compra e inspeccionar lotes para resguardar la continuidad operativa y bioseguridad agropecuaria.`
+                    : 'Salud de inventario óptima: Los niveles de insumos se encuentran dentro de los márgenes de seguridad y rotación zootécnica sin alertas críticas de desabastecimiento.'
+                }
+                columns={['Código', 'Insumo', 'Categoría', 'Stock Actual', 'Stock Mín.', 'Lote / Vence', 'Costo Unit.', 'Valor Total', 'Alertas']}
+                rows={(filteredItems || []).map((item) => {
+                  const alerts = Array.isArray(item?.alert_flags) ? item.alert_flags : [];
+                  const alertText = alerts.map((f) => INVENTORY_ALERT_LABELS[f] ?? f).join(', ') || 'Normal';
+                  const categoryText = safeText(
+                    item?.category_label ?? INVENTORY_CATEGORY_LABELS[item?.category as any],
+                    item?.category || 'General'
+                  );
+                  const batchExp = `${safeText(item?.batch_number ?? '', '—')} / ${formatDate(item?.expiration_date)}`;
+                  return [
+                    safeText(item?.code, `INS-${item?.id}`),
+                    safeText(item?.name, `Insumo #${item?.id}`),
+                    categoryText,
+                    formatQtyWithUnit(item?.current_stock, item?.unit),
+                    formatQtyWithUnit(item?.min_stock, item?.unit),
+                    batchExp,
+                    formatMoney(item?.unit_cost),
+                    formatMoney(item?.total_cost),
+                    alertText,
+                  ];
+                })}
+              />
+
+              {isAdmin ? (
+                <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
+                  Nuevo Insumo
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

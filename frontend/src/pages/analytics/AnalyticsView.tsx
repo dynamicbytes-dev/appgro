@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, TrendingUp, Users, Warehouse, FileText } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
+import { BarChart3, TrendingUp, Users, Warehouse } from 'lucide-react';
+import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { useAuth } from '../../context/AuthContext';
 import { farmService } from '../../services/farmService';
 import type { Farm } from '../../types/auth';
-import { generateKpiPdf } from '../../utils/pdfKpiGenerator';
 import { AnalyticsExecutiveTab } from './AnalyticsExecutiveTab';
 import { AnalyticsFinancialTab } from './AnalyticsFinancialTab';
 import { AnalyticsOperationsTab } from './AnalyticsOperationsTab';
@@ -79,36 +78,13 @@ export const AnalyticsView: React.FC = () => {
     }
   };
 
-  const handleExportPdf = () => {
-    const tabLabel = TABS.find((t) => t.id === activeTab)?.label || 'General';
-    const activeFarmObj = availableFarms.find((f) => String(f.id) === String(rootFarmFilter));
-    generateKpiPdf({
-      moduleName: `Analítica - ${tabLabel}`,
-      farmName: isRoot ? (activeFarmObj ? activeFarmObj.name : 'Consolidado Multigranja') : undefined,
-      farmCode: isRoot && activeFarmObj ? activeFarmObj.code : undefined,
-      summaryText:
-        'Consolidado oficial de indicadores clave de rendimiento (KPIs), métricas financieras, ocupación y seguimiento operativo emitido por Zootika.',
-      kpis: [
-        { label: 'Margen Operativo', value: '68.5%', subtext: 'Meta anual: >65%', status: 'success' },
-        { label: 'Eficiencia Conversión', value: '1.42', subtext: 'Rango óptimo pecuario', status: 'success' },
-        { label: 'Ocupación Galpones', value: '84.2%', subtext: 'Capacidad activa', status: 'info' },
-        { label: 'Cumplimiento Tareas', value: '96.8%', subtext: 'Personal en granja', status: 'success' },
-      ],
-      tables: [
-        {
-          title: 'Resumen de Rendimiento por Módulo Operativo',
-          headers: ['Módulo', 'Indicador Primario', 'Valor Actual', 'Meta', 'Estado'],
-          rows: [
-            ['Especies', 'Especies Activas', '6 sectores pecuarios', '6 sectores', 'Óptimo'],
-            ['Galpones', 'Capacidad Instalada', '12,500 animales', '15,000 max', 'Normal'],
-            ['Lotes', 'Tasa Supervivencia', '98.4%', '>97%', 'Excelente'],
-            ['Inventario', 'Rotación de Stock', '21 días', '<30 días', 'Controlado'],
-            ['Actividades', 'Tareas a Tiempo', '95.2%', '>90%', 'Cumplido'],
-          ],
-        },
-      ],
-    });
-  };
+  const activeTabMeta = TABS.find((t) => t.id === activeTab);
+  const activeFarmObj = availableFarms.find((f) => String(f.id) === String(rootFarmFilter));
+  const activeFarmDisplayName = isRoot
+    ? rootFarmFilter === 'all'
+      ? 'Consolidado Multigranja Zootika'
+      : activeFarmObj?.name || 'Granja Seleccionada'
+    : activeFarm?.name || 'Granja Activa';
 
   return (
     <div className="space-y-6">
@@ -159,15 +135,47 @@ export const AnalyticsView: React.FC = () => {
               </button>
             ))}
 
-            <Button
-              size="sm"
-              variant="outline"
-              icon={<FileText className="w-3.5 h-3.5" />}
-              onClick={handleExportPdf}
-              className="ml-1"
-            >
-              Reporte PDF
-            </Button>
+            <ExportKpiPdfButton
+              moduleTitle={`Módulo de Analítica y Reportes - ${activeTabMeta?.label || 'Ejecutivo'}`}
+              moduleSlug="analitica"
+              farmName={activeFarmDisplayName}
+              kpis={[
+                {
+                  title: 'Margen Operativo',
+                  value: '68.5%',
+                  subtitle: 'Meta anual superada (>65%)',
+                  tone: 'emerald',
+                },
+                {
+                  title: 'Ocupación Pecuaria',
+                  value: '84.2%',
+                  subtitle: 'Plazas activas en producción',
+                  tone: 'emerald',
+                },
+                {
+                  title: 'Eficiencia / FCR',
+                  value: '1.42',
+                  subtitle: 'Conversión zootécnica óptima',
+                  tone: 'emerald',
+                },
+                {
+                  title: 'Cumplimiento Tareas',
+                  value: '96.8%',
+                  subtitle: 'Desempeño operativo en granja',
+                  tone: 'emerald',
+                },
+              ]}
+              diagnosis="Evaluación ejecutiva global: El rendimiento agropecuario muestra solidez financiera con márgenes operativos sobre la meta, ocupación balanceada sin sobrepoblación y un índice de cumplimiento de tareas superior al 95%, garantizando trazabilidad y rentabilidad en la operación multigranja."
+              columns={['Dimensión', 'Indicador Clave', 'Valor Actual', 'Meta de Referencia', 'Evaluación']}
+              rows={[
+                ['Financiera', 'Margen Operativo Bruto', '68.5%', '> 65.0%', 'Óptimo'],
+                ['Pecuaria', 'Tasa de Supervivencia de Lotes', '98.4%', '> 97.0%', 'Excelente'],
+                ['Infraestructura', 'Ocupación de Galpones', '84.2%', '75% - 90%', 'Equilibrado'],
+                ['Inventario', 'Rotación de Stock e Insumos', '21 días', '< 30 días', 'Controlado'],
+                ['Personal', 'Cumplimiento de Tareas a Tiempo', '96.8%', '> 90.0%', 'Sobresaliente'],
+                ['Bioseguridad', 'Protocolos Sanitarios y Cuarentena', '100%', '100%', 'Cumplido'],
+              ]}
+            />
           </div>
         </div>
       </div>

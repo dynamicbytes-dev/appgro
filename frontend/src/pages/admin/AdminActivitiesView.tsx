@@ -13,13 +13,12 @@ import {
   Timer,
   Trash2,
   XCircle,
-  FileText,
 } from 'lucide-react';
-import { pdfKpiGenerators } from '../../utils/pdfKpiGenerator';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { activityService } from '../../services/activityService';
@@ -339,37 +338,50 @@ export const AdminActivitiesView: React.FC = () => {
           <Button variant="outline" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
             Actualizar
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              pdfKpiGenerators.actividades({
-                farmName: activeFarm?.name,
-                kpis: [
-                  { label: 'Total Actividades', value: stats?.total ?? activities.length, status: 'info' },
-                  { label: 'Pendientes', value: stats?.pending ?? 0, status: 'warning' },
-                  { label: 'En Progreso', value: stats?.in_progress ?? 0, status: 'info' },
-                  { label: 'Completadas', value: stats?.completed ?? 0, status: 'success' },
-                ],
-                tables: [
-                  {
-                    title: 'Listado de Actividades y Tareas Operativas',
-                    headers: ['ID', 'Título', 'Asignado a', 'Fecha Límite', 'Vencimiento', 'Estado'],
-                    rows: activities.map((a) => [
-                      `ACT-${a.id}`,
-                      a.title,
-                      a.assignee?.name || 'Sin asignar',
-                      a.due_date || '—',
-                      a.is_overdue ? 'Vencida' : 'A tiempo',
-                      ACTIVITY_STATUS_LABELS[a.status] || a.status,
-                    ]),
-                  },
-                ],
-              });
-            }}
-            icon={<FileText className="w-4 h-4" />}
-          >
-            Reporte PDF
-          </Button>
+          <ExportKpiPdfButton
+            moduleTitle="Módulo de Gestión de Actividades y Tareas"
+            moduleSlug="actividades"
+            kpis={[
+              {
+                title: 'Total Tareas',
+                value: stats?.total ?? activities.length,
+                subtitle: 'Asignadas en granja',
+                tone: 'slate',
+              },
+              {
+                title: '% Terminadas',
+                value: stats?.total ? `${((stats.completed / stats.total) * 100).toFixed(0)}%` : '0%',
+                subtitle: `${stats?.completed ?? 0} finalizadas`,
+                tone: 'emerald',
+              },
+              {
+                title: 'En Proceso',
+                value: stats?.in_progress ?? 0,
+                subtitle: 'Tareas en curso activo',
+                tone: 'amber',
+              },
+              {
+                title: 'Vencidas / Alerta',
+                value: `${stats?.overdue ?? 0} (${stats?.pending ?? 0} pendientes)`,
+                subtitle: (stats?.overdue ?? 0) > 0 ? 'Requiere atención inmediata' : 'Cronograma al día',
+                tone: (stats?.overdue ?? 0) > 0 ? 'red' : 'emerald',
+              },
+            ]}
+            diagnosis={
+              (stats?.overdue ?? 0) > 0
+                ? `Atención operativa: Se registran ${stats?.overdue} tareas vencidas que impactan el cronograma de manejo agropecuario. Se recomienda reasignar y priorizar su ejecución.`
+                : 'Ejecución operativa eficiente: Las actividades programadas se encuentran al día sin desviaciones críticas de calendario.'
+            }
+            columns={['Código', 'Título de la Tarea', 'Personal Asignado', 'Fecha Límite', 'Condición', 'Estado']}
+            rows={activities.map((a) => [
+              `ACT-${a.id}`,
+              a.title || '-',
+              fullName(a.assignee),
+              formatDate(a.due_date),
+              a.is_overdue ? 'Vencida' : 'A tiempo',
+              ACTIVITY_STATUS_LABELS[a.status] || a.status,
+            ])}
+          />
           {canManageActivities && (
             <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
               Nueva Actividad

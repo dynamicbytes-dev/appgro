@@ -10,6 +10,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { StatusBadge, normalizeIsActive } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
+import { ExportKpiPdfButton } from '../components/common/ExportKpiPdfButton';
 import { safeText } from '../utils/safeText';
 import {
   Layers,
@@ -29,9 +30,7 @@ import {
   ShieldCheck,
   Calendar,
   Trash2,
-  FileText,
 } from 'lucide-react';
-import { pdfKpiGenerators } from '../utils/pdfKpiGenerator';
 
 export interface OfficialCategory {
   id: string;
@@ -800,38 +799,53 @@ export const SpeciesView: React.FC = () => {
           >
             Actualizar Lista
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const activeCount = speciesList.filter((s) => normalizeIsActive(s.is_active)).length;
-              const inactiveCount = Math.max(0, speciesList.length - activeCount);
-              pdfKpiGenerators.especies({
-                farmName: activeFarm?.name,
-                kpis: [
-                  { label: 'Total Especies', value: speciesList.length, status: 'info' },
-                  { label: 'Especies Activas', value: activeCount, status: 'success' },
-                  { label: 'Inactivas / Pausadas', value: inactiveCount, status: 'warning' },
-                  { label: 'Sectores Pecuarios', value: 6, status: 'neutral' },
-                ],
-                tables: [
-                  {
-                    title: 'Inventario de Especies Registradas',
-                    headers: ['ID', 'Nombre Común', 'Sector Pecuario', 'Estado'],
-                    rows: speciesList.map((s) => [
-                      `ESP-${s.id}`,
-                      s.name,
-                      s.category || 'General',
-                      normalizeIsActive(s.is_active) ? 'Activa' : 'Inactiva',
-                    ]),
-                  },
-                ],
-              });
-            }}
-            icon={<FileText className="w-3.5 h-3.5" />}
-          >
-            Reporte PDF
-          </Button>
+          <ExportKpiPdfButton
+            moduleTitle="Módulo de Especies Pecuarias"
+            moduleSlug="especies"
+            kpis={[
+              {
+                title: 'Total Especies',
+                value: speciesList.length,
+                subtitle: 'Catálogo registrado',
+                tone: 'slate',
+              },
+              {
+                title: 'Especies Activas',
+                value: speciesList.filter((s) => normalizeIsActive(s.is_active)).length,
+                subtitle: 'Disponibles en galpones',
+                tone: 'emerald',
+              },
+              {
+                title: 'Inactivas / Pausadas',
+                value: Math.max(
+                  0,
+                  speciesList.length - speciesList.filter((s) => normalizeIsActive(s.is_active)).length
+                ),
+                subtitle: 'Fuera de producción',
+                tone: 'amber',
+              },
+              {
+                title: 'Sectores Pecuarios',
+                value: new Set(speciesList.map((s) => s.category).filter(Boolean)).size || 6,
+                subtitle: 'Categorías oficiales',
+                tone: 'emerald',
+              },
+            ]}
+            diagnosis={`Inventario pecuario con ${
+              speciesList.filter((s) => normalizeIsActive(s.is_active)).length
+            } especies activas de un total de ${
+              speciesList.length
+            } registradas, abarcando ${
+              new Set(speciesList.map((s) => s.category).filter(Boolean)).size || 6
+            } sectores pecuarios oficiales sin anomalías taxonómicas.`}
+            columns={['Código', 'Nombre Común', 'Sector Pecuario', 'Estado']}
+            rows={speciesList.map((s) => [
+              `ESP-${s.id}`,
+              s.name,
+              s.category || 'General',
+              normalizeIsActive(s.is_active) ? 'Activa' : 'Inactiva',
+            ])}
+          />
           <Button
             variant="accent"
             size="sm"

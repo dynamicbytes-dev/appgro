@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { historyService, type ActivityLog, type HistoryPaginationMeta, type HistoryStats } from '../services/historyService';
@@ -6,6 +6,7 @@ import { farmService } from '../services/farmService';
 import type { Farm } from '../types/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { ExportKpiPdfButton } from '../components/common/ExportKpiPdfButton';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { safeText } from '../utils/safeText';
@@ -361,6 +362,93 @@ export const HistoryView: React.FC = () => {
     ? 'Supervisión centralizada, auditoría y trazabilidad cronológica de cambios en todas las granjas del sistema.'
     : `Registro cronológico y trazabilidad de eventos y operaciones realizadas exclusivamente en tu granja (${userFarmName}).`;
 
+  const historyKpis = useMemo(() => {
+    const totalEvents = stats?.total_records || pagination?.total || (logs || []).length;
+
+    // Actividad reciente (hoy o última ventana temporal)
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayEvents = (logs || []).filter((l) => l?.created_at && String(l.created_at).startsWith(todayStr)).length;
+    const recentDisplay = todayEvents > 0 ? `${todayEvents} hoy` : `${(logs || []).length} en página`;
+
+    // Usuarios activos únicos en bitácora
+    const uniqueUsers = new Set(
+      (logs || [])
+        .map((l) => l?.user?.name || l?.user?.email || (l?.user_id ? `Usuario #${l.user_id}` : null))
+        .filter(Boolean)
+    ).size;
+
+    // Módulo con mayor movimiento
+    const moduleCounts: Record<string, number> = {};
+    (logs || []).forEach((l) => {
+      const mod = l?.module || 'General';
+      moduleCounts[mod] = (moduleCounts[mod] || 0) + 1;
+    });
+    let topModule = 'General';
+    let topCount = 0;
+    Object.entries(moduleCounts).forEach(([mod, count]) => {
+      if (count > topCount) {
+        topCount = count;
+        topModule = mod;
+      }
+    });
+
+    return [
+      {
+        title: 'Total Eventos',
+        value: totalEvents,
+        subtitle: 'Registros auditados',
+        tone: 'slate' as const,
+      },
+      {
+        title: 'Actividad Reciente',
+        value: recentDisplay,
+        subtitle: todayEvents > 0 ? 'Operaciones hoy' : 'Página actual',
+        tone: 'emerald' as const,
+      },
+      {
+        title: 'Usuarios Activos',
+        value: uniqueUsers || 1,
+        subtitle: 'Personal registrado',
+        tone: 'slate' as const,
+      },
+      {
+        title: 'Módulo Principal',
+        value: topModule,
+        subtitle: topCount > 0 ? `${topCount} operaciones registradas` : 'Mayor actividad',
+        tone: 'emerald' as const,
+      },
+    ];
+  }, [stats, pagination, logs]);
+
+  const historyDiagnosis = useMemo(() => {
+    const farmScope = isRoot
+      ? rootFarmFilter === 'all'
+        ? 'todas las granjas del sistema (Multigranja)'
+        : availableFarms.find((f) => String(f.id) === String(rootFarmFilter))?.name || 'la granja seleccionada'
+      : userFarmName;
+
+    const totalEvents = stats?.total_records || pagination?.total || (logs || []).length;
+    return `Registro de auditoría conforme: Se han consolidado ${totalEvents} eventos de trazabilidad operacional sobre ${farmScope}. Las acciones registradas reflejan un seguimiento cronológico íntegro de creaciones, modificaciones y eliminaciones de acuerdo con los protocolos de bioseguridad y gestión zootécnica de Zootika.`;
+  }, [isRoot, rootFarmFilter, availableFarms, userFarmName, stats, pagination, logs]);
+
+  const historyColumns = ['Fecha / Hora', 'Usuario / Rol', 'Módulo', 'Acción', 'Descripción del Evento'];
+
+  const historyRows = useMemo(() => {
+    return (logs || []).map((l) => {
+      const dateFormatted = formatDateTime(l?.created_at);
+      const userName = l?.user?.name
+        ? `${l.user.name} ${l.user.lastname || ''}`.trim()
+        : 'Sistema';
+      const userRole = l?.user?.role ? l.user.role.toUpperCase() : (l?.user_id ? 'USUARIO' : 'SISTEMA');
+      const userAndRole = `${userName} (${userRole})`;
+      const mod = safeText(l?.module, 'General');
+      const act = safeText(l?.action, 'REGISTRO');
+      const desc = safeText(l?.description, 'Sin detalle');
+
+      return [dateFormatted, userAndRole, mod, act, desc];
+    });
+  }, [logs]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* 1. Descriptive Header Bar with Role Context */}
@@ -399,6 +487,21 @@ export const HistoryView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <ExportKpiPdfButton
+            moduleTitle="Historial de Actividades y Auditoría"
+            moduleSlug="historial_actividades"
+            farmName={
+              isRoot
+                ? rootFarmFilter === 'all'
+                  ? 'Consolidado Multigranja Zootika'
+                  : availableFarms.find((f) => String(f.id) === String(rootFarmFilter))?.name || userFarmName
+                : userFarmName
+            }
+            kpis={historyKpis}
+            diagnosis={historyDiagnosis}
+            columns={historyColumns}
+            rows={historyRows}
+          />
           <Button
             variant="outline"
             size="sm"

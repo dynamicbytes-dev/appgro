@@ -9,6 +9,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { StatusBadge, normalizeIsActive } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
+import { ExportKpiPdfButton } from '../components/common/ExportKpiPdfButton';
 import { safeText } from '../utils/safeText';
 import {
   Warehouse,
@@ -30,9 +31,7 @@ import {
   ChevronRight,
   Activity,
   Trash2,
-  FileText,
 } from 'lucide-react';
-import { pdfKpiGenerators } from '../utils/pdfKpiGenerator';
 
 // Propósitos permitidos por sector pecuario oficial
 const SECTOR_PURPOSES: Record<string, string[]> = {
@@ -640,39 +639,79 @@ export const ShedsView: React.FC = () => {
           >
             Actualizar
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              pdfKpiGenerators.galpones({
-                farmName: activeFarm?.name,
-                kpis: [
-                  { label: 'Galpones Totales', value: stats.total_barns, status: 'info' },
-                  { label: 'Galpones Activos', value: stats.active_barns, status: 'success' },
-                  { label: 'Capacidad Global', value: stats.global_capacity, status: 'info' },
-                  { label: 'Especies Asociadas', value: stats.associated_species, status: 'success' },
-                ],
-                tables: [
+          {(() => {
+            const totalOccupied = barnsList.reduce(
+              (acc, b) => acc + (Number((b as any).occupied_capacity) || 0),
+              0
+            );
+            const occupancyPct =
+              stats.global_capacity > 0
+                ? ((totalOccupied / stats.global_capacity) * 100).toFixed(1) + '%'
+                : '0%';
+            return (
+              <ExportKpiPdfButton
+                moduleTitle="Módulo de Galpones e Infraestructura Pecuaria"
+                moduleSlug="galpones"
+                kpis={[
                   {
-                    title: 'Inventario de Galpones e Infraestructura Pecuaria',
-                    headers: ['ID', 'Nombre', 'Sector Pecuario', 'Propósito', 'Capacidad Máx', 'Ocupación', 'Estado'],
-                    rows: barnsList.map((b) => [
-                      `GAL-${b.id}`,
-                      b.name,
-                      safeText(b.species?.name, b.sector || 'General'),
-                      safeText(b.purpose, 'Producción'),
-                      String(b.max_capacity),
-                      `${(b as any).occupied_capacity || 0} / ${b.max_capacity}`,
-                      normalizeIsActive(b.is_active) ? 'Activo' : 'Inactivo',
-                    ]),
+                    title: 'Galpones Totales',
+                    value: stats.total_barns,
+                    subtitle: 'Estructuras registradas',
+                    tone: 'slate',
                   },
-                ],
-              });
-            }}
-            icon={<FileText className="w-3.5 h-3.5" />}
-          >
-            Reporte PDF
-          </Button>
+                  {
+                    title: 'Galpones Activos',
+                    value: stats.active_barns,
+                    subtitle: 'En servicio operativo',
+                    tone: 'emerald',
+                  },
+                  {
+                    title: 'Capacidad Instalada',
+                    value: `${stats.global_capacity.toLocaleString()} plazas`,
+                    subtitle: 'Capacidad zootécnica máx.',
+                    tone: 'slate',
+                  },
+                  {
+                    title: 'Ocupación Real',
+                    value: `${occupancyPct} (${totalOccupied.toLocaleString()} animales)`,
+                    subtitle: 'Animales alojados activos',
+                    tone:
+                      totalOccupied > stats.global_capacity
+                        ? 'red'
+                        : totalOccupied > stats.global_capacity * 0.9
+                        ? 'amber'
+                        : 'emerald',
+                  },
+                ]}
+                diagnosis={`Capacidad instalada global de ${stats.global_capacity.toLocaleString()} plazas con una tasa de ocupación real del ${occupancyPct} (${totalOccupied.toLocaleString()} animales alojados) en ${stats.active_barns} galpones operativos.`}
+                columns={[
+                  'ID',
+                  'Nombre Galpón',
+                  'Sector Pecuario',
+                  'Propósito',
+                  'Capacidad Máx',
+                  'Ocupación Real',
+                  '% Ocupación',
+                  'Estado',
+                ]}
+                rows={barnsList.map((b) => {
+                  const occ = Number((b as any).occupied_capacity) || 0;
+                  const pct =
+                    b.max_capacity > 0 ? ((occ / b.max_capacity) * 100).toFixed(0) + '%' : '0%';
+                  return [
+                    `GAL-${b.id}`,
+                    b.name,
+                    safeText(b.species?.name, b.sector || 'General'),
+                    safeText(b.purpose, 'Producción'),
+                    String(b.max_capacity),
+                    String(occ),
+                    pct,
+                    normalizeIsActive(b.is_active) ? 'Activo' : 'Inactivo',
+                  ];
+                })}
+              />
+            );
+          })()}
           <Button
             variant="accent"
             size="sm"
