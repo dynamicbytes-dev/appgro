@@ -13,7 +13,9 @@ import {
   Timer,
   Trash2,
   XCircle,
+  FileText,
 } from 'lucide-react';
+import { pdfKpiGenerators } from '../../utils/pdfKpiGenerator';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
@@ -336,6 +338,37 @@ export const AdminActivitiesView: React.FC = () => {
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
             Actualizar
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              pdfKpiGenerators.actividades({
+                farmName: activeFarm?.name,
+                kpis: [
+                  { label: 'Total Actividades', value: stats?.total ?? activities.length, status: 'info' },
+                  { label: 'Pendientes', value: stats?.pending ?? 0, status: 'warning' },
+                  { label: 'En Progreso', value: stats?.in_progress ?? 0, status: 'info' },
+                  { label: 'Completadas', value: stats?.completed ?? 0, status: 'success' },
+                ],
+                tables: [
+                  {
+                    title: 'Listado de Actividades y Tareas Operativas',
+                    headers: ['ID', 'Título', 'Asignado a', 'Fecha Límite', 'Vencimiento', 'Estado'],
+                    rows: activities.map((a) => [
+                      `ACT-${a.id}`,
+                      a.title,
+                      a.assignee?.name || 'Sin asignar',
+                      a.due_date || '—',
+                      a.is_overdue ? 'Vencida' : 'A tiempo',
+                      ACTIVITY_STATUS_LABELS[a.status] || a.status,
+                    ]),
+                  },
+                ],
+              });
+            }}
+            icon={<FileText className="w-4 h-4" />}
+          >
+            Reporte PDF
           </Button>
           {canManageActivities && (
             <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>

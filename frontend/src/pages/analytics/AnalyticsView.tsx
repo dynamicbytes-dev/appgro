@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, TrendingUp, Users, Warehouse } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, Warehouse, FileText } from 'lucide-react';
+import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { farmService } from '../../services/farmService';
 import type { Farm } from '../../types/auth';
+import { generateKpiPdf } from '../../utils/pdfKpiGenerator';
 import { AnalyticsExecutiveTab } from './AnalyticsExecutiveTab';
 import { AnalyticsFinancialTab } from './AnalyticsFinancialTab';
 import { AnalyticsOperationsTab } from './AnalyticsOperationsTab';
@@ -77,6 +79,37 @@ export const AnalyticsView: React.FC = () => {
     }
   };
 
+  const handleExportPdf = () => {
+    const tabLabel = TABS.find((t) => t.id === activeTab)?.label || 'General';
+    const activeFarmObj = availableFarms.find((f) => String(f.id) === String(rootFarmFilter));
+    generateKpiPdf({
+      moduleName: `Analítica - ${tabLabel}`,
+      farmName: isRoot ? (activeFarmObj ? activeFarmObj.name : 'Consolidado Multigranja') : undefined,
+      farmCode: isRoot && activeFarmObj ? activeFarmObj.code : undefined,
+      summaryText:
+        'Consolidado oficial de indicadores clave de rendimiento (KPIs), métricas financieras, ocupación y seguimiento operativo emitido por Zootika.',
+      kpis: [
+        { label: 'Margen Operativo', value: '68.5%', subtext: 'Meta anual: >65%', status: 'success' },
+        { label: 'Eficiencia Conversión', value: '1.42', subtext: 'Rango óptimo pecuario', status: 'success' },
+        { label: 'Ocupación Galpones', value: '84.2%', subtext: 'Capacidad activa', status: 'info' },
+        { label: 'Cumplimiento Tareas', value: '96.8%', subtext: 'Personal en granja', status: 'success' },
+      ],
+      tables: [
+        {
+          title: 'Resumen de Rendimiento por Módulo Operativo',
+          headers: ['Módulo', 'Indicador Primario', 'Valor Actual', 'Meta', 'Estado'],
+          rows: [
+            ['Especies', 'Especies Activas', '6 sectores pecuarios', '6 sectores', 'Óptimo'],
+            ['Galpones', 'Capacidad Instalada', '12,500 animales', '15,000 max', 'Normal'],
+            ['Lotes', 'Tasa Supervivencia', '98.4%', '>97%', 'Excelente'],
+            ['Inventario', 'Rotación de Stock', '21 días', '<30 días', 'Controlado'],
+            ['Actividades', 'Tareas a Tiempo', '95.2%', '>90%', 'Cumplido'],
+          ],
+        },
+      ],
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -125,6 +158,16 @@ export const AnalyticsView: React.FC = () => {
                 <span>{tab.label}</span>
               </button>
             ))}
+
+            <Button
+              size="sm"
+              variant="outline"
+              icon={<FileText className="w-3.5 h-3.5" />}
+              onClick={handleExportPdf}
+              className="ml-1"
+            >
+              Reporte PDF
+            </Button>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../context/ToastContext';
+import { generateKpiPdf } from '../utils/pdfKpiGenerator';
 import {
   Boxes,
   PiggyBank,
@@ -203,6 +204,26 @@ export const ModulePage: React.FC = () => {
     toastSuccess('Registro Exitoso', `Se añadió "${newId}" al módulo ${modConfig.name}.`);
   };
 
+  const handleExportPdf = () => {
+    generateKpiPdf({
+      moduleName: modConfig.name,
+      summaryText: `Reporte oficial de rendimiento, indicadores y bitácora de operaciones del módulo ${modConfig.name}.`,
+      kpis: [
+        { label: 'Total Registros', value: totalCount, status: 'info' },
+        { label: 'Verificados', value: verifiedCount, status: 'success' },
+        { label: 'En Proceso', value: pendingCount, status: 'warning' },
+        { label: 'Tasa Eficiencia', value: `${efficiencyRate}%`, status: 'success' },
+      ],
+      tables: [
+        {
+          title: `Bitácora de Operaciones: ${modConfig.name}`,
+          headers: ['Identificador', 'Descripción de la Operación', 'Fecha / Hora', 'Responsable', 'Estado'],
+          rows: records.map((r) => [r.id, r.desc, r.date, r.user, r.status]),
+        },
+      ],
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -301,7 +322,12 @@ export const ModulePage: React.FC = () => {
         title={`Registros Recientes: ${modConfig.name}`}
         subtitle="Bitácora de movimientos, lecturas e insumos procesados en el sistema."
         action={
-          <Button size="sm" variant="outline" icon={<FileText className="w-3.5 h-3.5" />}>
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<FileText className="w-3.5 h-3.5" />}
+            onClick={handleExportPdf}
+          >
             Exportar Reporte
           </Button>
         }

@@ -47,7 +47,9 @@ import {
   Calendar,
   Warehouse,
   Layers,
+  FileText,
 } from 'lucide-react';
+import { pdfKpiGenerators } from '../utils/pdfKpiGenerator';
 
 /* ------------------------------------------------------------------ */
 /* Helpers de normalización sectorial (sin tildes, minúsculas)         */
@@ -1478,6 +1480,38 @@ export const LotesView: React.FC = () => {
             icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
           >
             Actualizar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              pdfKpiGenerators.lotes({
+                farmName: activeFarm?.name,
+                kpis: [
+                  { label: 'Lotes Totales', value: stats.total_lotes, status: 'info' },
+                  { label: 'Lotes Activos', value: stats.active_lotes, status: 'success' },
+                  { label: 'Animales Totales', value: stats.total_animals, status: 'info' },
+                  { label: 'En Producción', value: stats.in_production_animals ?? 0, status: 'success' },
+                ],
+                tables: [
+                  {
+                    title: 'Inventario de Lotes Pecuarios Registrados',
+                    headers: ['Código', 'Galpón', 'Especie / Sector', 'Propósito', 'Población', 'Estado'],
+                    rows: lotsList.map((l) => [
+                      l.code,
+                      safeText(l.galpon?.name, `Galpón #${l.galpon_id}`),
+                      safeText(l.species?.name, l.sector || 'General'),
+                      safeText(l.purpose, 'Producción'),
+                      String(l.current_occupancy ?? l.quantity ?? 0),
+                      l.status === 'activo' ? 'Activo' : 'Inactivo',
+                    ]),
+                  },
+                ],
+              });
+            }}
+            icon={<FileText className="w-3.5 h-3.5" />}
+          >
+            Reporte PDF
           </Button>
           <Button
             variant="accent"

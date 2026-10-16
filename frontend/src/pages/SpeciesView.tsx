@@ -29,7 +29,9 @@ import {
   ShieldCheck,
   Calendar,
   Trash2,
+  FileText,
 } from 'lucide-react';
+import { pdfKpiGenerators } from '../utils/pdfKpiGenerator';
 
 export interface OfficialCategory {
   id: string;
@@ -797,6 +799,38 @@ export const SpeciesView: React.FC = () => {
             icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
           >
             Actualizar Lista
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const activeCount = speciesList.filter((s) => normalizeIsActive(s.is_active)).length;
+              const inactiveCount = Math.max(0, speciesList.length - activeCount);
+              pdfKpiGenerators.especies({
+                farmName: activeFarm?.name,
+                kpis: [
+                  { label: 'Total Especies', value: speciesList.length, status: 'info' },
+                  { label: 'Especies Activas', value: activeCount, status: 'success' },
+                  { label: 'Inactivas / Pausadas', value: inactiveCount, status: 'warning' },
+                  { label: 'Sectores Pecuarios', value: 6, status: 'neutral' },
+                ],
+                tables: [
+                  {
+                    title: 'Inventario de Especies Registradas',
+                    headers: ['ID', 'Nombre Común', 'Sector Pecuario', 'Estado'],
+                    rows: speciesList.map((s) => [
+                      `ESP-${s.id}`,
+                      s.name,
+                      s.category || 'General',
+                      normalizeIsActive(s.is_active) ? 'Activa' : 'Inactiva',
+                    ]),
+                  },
+                ],
+              });
+            }}
+            icon={<FileText className="w-3.5 h-3.5" />}
+          >
+            Reporte PDF
           </Button>
           <Button
             variant="accent"

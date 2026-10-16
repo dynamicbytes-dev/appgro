@@ -9,7 +9,9 @@ import {
   TrendingDown,
   TrendingUp,
   Wallet,
+  FileText,
 } from 'lucide-react';
+import { pdfKpiGenerators } from '../../utils/pdfKpiGenerator';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -125,7 +127,38 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          onClick={() => {
+            pdfKpiGenerators.inventario({
+              farmName: activeFarm?.name,
+              kpis: [
+                { label: 'Insumos Totales', value: stats.total, status: 'info' },
+                { label: 'Valorización Inventario', value: formatMoney(stats.totalValue), status: 'success' },
+                { label: 'Bajo Mínimo', value: stats.low, status: stats.low > 0 ? 'danger' : 'success' },
+                { label: 'Sobre Stock', value: stats.over, status: 'warning' },
+                { label: 'Por Vencer', value: stats.expiring, status: stats.expiring > 0 ? 'warning' : 'success' },
+                { label: 'Vencidos', value: stats.expired, status: stats.expired > 0 ? 'danger' : 'success' },
+              ],
+              tables: [
+                {
+                  title: 'Resumen de Alertas Críticas de Inventario',
+                  headers: ['Tipo de Alerta', 'Cantidad de Artículos', 'Nivel de Riesgo'],
+                  rows: [
+                    ['Bajo Mínimo (Quiebre de Stock)', String(stats.low), stats.low > 0 ? 'Crítico' : 'Normal'],
+                    ['Sobre Stock (Exceso de Insumos)', String(stats.over), stats.over > 0 ? 'Atención' : 'Normal'],
+                    ['Próximos a Vencer (30 días)', String(stats.expiring), stats.expiring > 0 ? 'Alerta' : 'Normal'],
+                    ['Insumos Vencidos', String(stats.expired), stats.expired > 0 ? 'Inmovilizar' : 'Normal'],
+                  ],
+                },
+              ],
+            });
+          }}
+          icon={<FileText className="w-4 h-4" />}
+        >
+          Reporte PDF
+        </Button>
         <Button variant="outline" onClick={() => void loadPanel()} icon={<RefreshCw className="w-4 h-4" />}>
           Actualizar
         </Button>
