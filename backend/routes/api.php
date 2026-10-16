@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\Api\ExecutivePdfReportController;
 use App\Http\Controllers\AppConfigController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BarnController;
@@ -116,6 +117,9 @@ $registerRoutes = function () {
 
     // Operational routes protected by JWT + Module Access Middleware
     Route::middleware('jwt.auth')->group(function () {
+
+        // Reportes Ejecutivos para Exportación PDF
+        Route::get('reports/{module}/executive-kpis', [ExecutivePdfReportController::class, 'getModuleKpiReport']);
 
         // Farm Selector for Forms & Selects
         Route::get('farms/select', [RootFarmController::class, 'select']);
