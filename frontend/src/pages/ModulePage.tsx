@@ -42,6 +42,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 import { SpeciesView } from './SpeciesView';
 import { GalponesView } from './GalponesView';
 import { LotesView } from './LotesView';
+import { AdminActivitiesView } from './admin/AdminActivitiesView';
 
 interface ModuleRecord {
   id: string;
@@ -103,6 +104,23 @@ export const ModulePage: React.FC = () => {
   const { moduleId } = useParams<{ moduleId: ModuleId }>();
   const { toastSuccess } = useToast();
 
+  const isLots = (moduleId as string) === 'lotes' || (moduleId as string) === 'lots';
+  const isActivities =
+    (moduleId as string) === 'actividades' || (moduleId as string) === 'activities';
+
+  // Dynamic records state for current module
+  // (los hooks deben ejecutarse antes de cualquier early-return)
+  const [records, setRecords] = useState<ModuleRecord[]>(() => {
+    if (isLots) return INITIAL_LOTS_RECORDS;
+    if (isActivities) return INITIAL_ACTIVITIES_RECORDS;
+    return INITIAL_LOTS_RECORDS;
+  });
+
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [recordTitle, setRecordTitle] = useState('');
+  const [recordNote, setRecordNote] = useState('');
+  const [recordStatus, setRecordStatus] = useState<'Verificado' | 'En Proceso'>('Verificado');
+
   if (moduleId === 'especies' || (moduleId as string) === 'species') {
     return <SpeciesView />;
   }
@@ -115,22 +133,12 @@ export const ModulePage: React.FC = () => {
     return <LotesView />;
   }
 
+  // El módulo de actividades consume la API real (no el genérico en memoria)
+  if (moduleId === 'actividades' || (moduleId as string) === 'activities') {
+    return <AdminActivitiesView />;
+  }
+
   const modConfig = moduleId ? SYSTEM_MODULES[moduleId] : null;
-
-  const isLots = (moduleId as string) === 'lotes' || (moduleId as string) === 'lots';
-  const isActivities = moduleId === 'actividades' || (moduleId as string) === 'activities';
-
-  // Dynamic records state for current module
-  const [records, setRecords] = useState<ModuleRecord[]>(() => {
-    if (isLots) return INITIAL_LOTS_RECORDS;
-    if (isActivities) return INITIAL_ACTIVITIES_RECORDS;
-    return INITIAL_LOTS_RECORDS;
-  });
-
-  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
-  const [recordTitle, setRecordTitle] = useState('');
-  const [recordNote, setRecordNote] = useState('');
-  const [recordStatus, setRecordStatus] = useState<'Verificado' | 'En Proceso'>('Verificado');
 
   // Compute live metrics automatically
   const totalCount = records.length;

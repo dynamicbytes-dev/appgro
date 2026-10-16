@@ -56,8 +56,11 @@ class CheckModuleAccess
                 'galpones' => 'barns',
                 'barns' => 'galpones',
                 'lotes' => 'lots',
+                'lots' => 'lotes',
                 'history' => 'historial',
                 'historial' => 'history',
+                'actividades' => 'activities',
+                'activities' => 'actividades',
                 default => null,
             };
             if ($alias) {
@@ -79,6 +82,10 @@ class CheckModuleAccess
         }
         if (in_array($module->code, ['lots', 'lotes'])) {
             $equiv = Module::whereIn('code', ['lots', 'lotes'])->pluck('id')->toArray();
+            $equivalentModuleIds = array_unique(array_merge($equivalentModuleIds, $equiv));
+        }
+        if (in_array($module->code, ['activities', 'actividades'])) {
+            $equiv = Module::whereIn('code', ['activities', 'actividades'])->pluck('id')->toArray();
             $equivalentModuleIds = array_unique(array_merge($equivalentModuleIds, $equiv));
         }
 

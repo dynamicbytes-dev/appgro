@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { SYSTEM_MODULES } from '../config/modules';
+import { activityService } from '../services/activityService';
 import {
   ClipboardCheck,
   CheckCircle2,
@@ -20,6 +21,8 @@ import {
   Users,
   ShieldCheck,
   Clock,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -37,10 +40,43 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
 import { safeText } from '../utils/safeText';
+import { ACTIVITY_STATUS_LABELS, type Activity } from '../types/activity';
+
+const formatShortDate = (iso?: string | null): string => {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+};
 
 export const EncargadoDashboard: React.FC = () => {
   const { user, activeFarm } = useAuth();
   const navigate = useNavigate();
+
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(true);
+
+  const loadActivities = useCallback(async () => {
+    setIsLoadingActivities(true);
+    try {
+      const result = await activityService.getMy();
+      // Mostrar primero las pendientes/en proceso, limitado a 5
+      const sorted = [...(result.data || [])].sort((a, b) => {
+        const order: Record<string, number> = { pendiente: 0, en_proceso: 1, terminada: 2 };
+        return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+      });
+      setActivities(sorted.slice(0, 5));
+    } catch {
+      // El módulo puede estar deshabilitado: el dashboard sigue funcionando
+      setActivities([]);
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadActivities();
+  }, [loadActivities]);
 
   if (!user) {
     return <SkeletonLoader type="dashboard" />;
@@ -135,70 +171,82 @@ export const EncargadoDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Daily Routine / Checklists */}
+      {/* Daily Routine / Assigned Activities */}
       <Card
-        title="Bitácora y Tareas del Día"
-        subtitle="Registro diario de eventos en galpones, alimentación y controles sanitarios."
+        title="Mis Actividades Asignadas"
+        subtitle="Tareas que tu administrador te ha asignado. Gestiona el estado desde «Mis Actividades»."
+        action={
+          <button
+            onClick={() => navigate('/mis-actividades')}
+            className="flex items-center gap-1 text-xs font-bold text-[#4E9F3D] hover:underline cursor-pointer"
+          >
+            <span>Ver todas</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        }
       >
-        <div className="space-y-3">
-          {[
-            {
-              id: 'task-1',
-              title: 'Verificación de alimento en siloss/galpón A-1',
-              time: '08:30 AM',
-              status: 'completed',
-            },
-            {
-              id: 'task-2',
-              title: 'Inspección de temperatura y humedad en Lote Porcino P-03',
-              time: '10:15 AM',
-              status: 'completed',
-            },
-            {
-              id: 'task-3',
-              title: 'Registro de bajas y vacunación preventiva',
-              time: '02:00 PM',
-              status: 'pending',
-            },
-            {
-              id: 'task-4',
-              title: 'Cierre de ciclo de ventilación nocturna',
-              time: '06:00 PM',
-              status: 'pending',
-            },
-          ].map((task) => (
-            <div
-              key={task.id}
-              className="p-3 rounded-xl border border-gray-100 dark:border-[#263632] flex items-center justify-between bg-gray-50/50 dark:bg-[#121816]"
-            >
-              <div className="flex items-center gap-3">
-                <CheckCircle2
-                  className={`w-5 h-5 ${
-                    task.status === 'completed'
-                      ? 'text-[#4E9F3D]'
-                      : 'text-gray-300 dark:text-gray-600'
-                  }`}
-                />
-                <div>
-                  <div className="font-semibold text-xs text-gray-900 dark:text-gray-100">
-                    {task.title}
+        {isLoadingActivities ? (
+          <div className="flex items-center justify-center py-8 text-gray-400">
+            <RefreshCw className="w-5 h-5 animate-spin" />
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="py-8 text-center text-gray-400 dark:text-gray-500">
+            <ClipboardCheck className="w-8 h-8 mx-auto mb-2 opacity-40" />
+            <p className="text-sm font-semibold">No tienes actividades asignadas por ahora.</p>
+            <p className="text-xs mt-1">Cuando tu administrador te asigne una tarea, aparecerá aquí.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activities.map((activity) => (
+              <div
+                key={activity.id}
+                className="p-3 rounded-xl border border-gray-100 dark:border-[#263632] flex items-center justify-between bg-gray-50/50 dark:bg-[#121816]"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {activity.status === 'terminada' ? (
+                    <CheckCircle2 className="w-5 h-5 text-[#4E9F3D] shrink-0" />
+                  ) : activity.is_overdue ? (
+                    <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+                  ) : (
+                    <Clock className="w-5 h-5 text-blue-500 shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-semibold text-xs text-gray-900 dark:text-gray-100 truncate">
+                      {safeText(activity.title, `Actividad #${activity.id}`)}
+                    </div>
+                    <div className="text-[10px] text-gray-500">
+                      Fecha límite: {formatShortDate(activity.due_date)}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-gray-500">Hora programada: {task.time}</div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {activity.is_overdue && activity.status !== 'terminada' && (
+                    <Badge variant="danger" className="text-[10px]!">
+                      Vencida
+                    </Badge>
+                  )}
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      activity.status === 'terminada'
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                        : activity.status === 'en_proceso'
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                    }`}
+                  >
+                    {safeText(
+                      ACTIVITY_STATUS_LABELS[activity.status as keyof typeof ACTIVITY_STATUS_LABELS] ??
+                        activity.status_label ??
+                        activity.status,
+                      activity.status
+                    )}
+                  </span>
                 </div>
               </div>
-
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  task.status === 'completed'
-                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                }`}
-              >
-                {task.status === 'completed' ? 'Completada' : 'Pendiente'}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { ProfileModal } from './ProfileModal';
+import { NotificationBell } from './NotificationBell';
 import { safeText } from '../../utils/safeText';
 import {
   LogOut,
@@ -114,9 +115,12 @@ export const Navbar: React.FC = () => {
           </div>
         )}
 
-        {/* Right Controls: Role Badge, Theme Toggle, User Profile */}
+        {/* Right Controls: Notifications, Role Badge, Theme Toggle, User Profile */}
         <div className="flex items-center space-x-3">
-          
+
+          {/* Notification Bell (bandeja de notificaciones) */}
+          <NotificationBell />
+
           {/* Active Role Badge */}
           <div className="hidden sm:flex items-center px-2.5 py-1 rounded-lg bg-[#143A2F] border border-[#256653] text-xs font-semibold text-[#6DBF5C]">
             <ShieldCheck className="w-3.5 h-3.5 mr-1 text-amber-300" />

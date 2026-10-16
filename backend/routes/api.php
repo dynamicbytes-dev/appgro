@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AdminDashboardController;
 use App\Http\Controllers\AuthController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\BarnController;
 use App\Http\Controllers\GalponController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\LotController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Root\RootAdminController;
 use App\Http\Controllers\Root\RootDashboardController;
 use App\Http\Controllers\Root\RootFarmController;
@@ -249,6 +251,45 @@ $registerRoutes = function () {
             Route::get('animals/{animalId}/services', [LotController::class, 'services']);
             Route::post('animals/{animalId}/services', [LotController::class, 'storeService']);
             Route::delete('services/{serviceId}', [LotController::class, 'destroyService']);
+        });
+
+        // Actividades Module ('activities' / alias 'actividades')
+        Route::middleware('module.access:activities')->prefix('activities')->group(function () {
+            Route::get('stats', [ActivityController::class, 'stats']);
+            Route::get('summary', [ActivityController::class, 'stats']);
+            Route::get('my', [ActivityController::class, 'myActivities']);
+            Route::get('/', [ActivityController::class, 'index']);
+            Route::post('/', [ActivityController::class, 'store']);
+            Route::get('{id}', [ActivityController::class, 'show']);
+            Route::put('{id}', [ActivityController::class, 'update']);
+            Route::patch('{id}', [ActivityController::class, 'update']);
+            Route::patch('{id}/status', [ActivityController::class, 'updateStatus']);
+            Route::delete('{id}', [ActivityController::class, 'destroy']);
+        });
+        Route::middleware('module.access:activities')->get('admin/activities/stats', [ActivityController::class, 'stats']);
+        Route::middleware('module.access:activities')->get('admin/activities/summary', [ActivityController::class, 'stats']);
+        Route::middleware('module.access:activities')->get('admin/activities', [ActivityController::class, 'index']);
+
+        // Alias 'actividades' para compatibilidad con el frontend
+        Route::middleware('module.access:actividades')->prefix('actividades')->group(function () {
+            Route::get('stats', [ActivityController::class, 'stats']);
+            Route::get('summary', [ActivityController::class, 'stats']);
+            Route::get('my', [ActivityController::class, 'myActivities']);
+            Route::get('/', [ActivityController::class, 'index']);
+            Route::post('/', [ActivityController::class, 'store']);
+            Route::get('{id}', [ActivityController::class, 'show']);
+            Route::put('{id}', [ActivityController::class, 'update']);
+            Route::patch('{id}', [ActivityController::class, 'update']);
+            Route::patch('{id}/status', [ActivityController::class, 'updateStatus']);
+            Route::delete('{id}', [ActivityController::class, 'destroy']);
+        });
+
+        // Bandeja de notificaciones del usuario (solo JWT, sin module.access:
+        // la campana del navbar debe funcionar aunque el módulo esté deshabilitado)
+        Route::prefix('notifications')->group(function () {
+            Route::get('/', [NotificationController::class, 'index']);
+            Route::post('read-all', [NotificationController::class, 'markAllAsRead']);
+            Route::post('{id}/read', [NotificationController::class, 'markAsRead']);
         });
 
         // Historial y Auditoría Module ('history')

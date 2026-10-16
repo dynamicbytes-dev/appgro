@@ -65,6 +65,9 @@ export const Sidebar: React.FC = () => {
     ? userModules.filter((m) => m !== 'historial')
     : userModules;
 
+  // ¿El módulo de actividades está habilitado para el usuario/granja?
+  const isActivitiesEnabled = isRoot || userModules.includes('actividades');
+
   const getNavLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
       isActive
@@ -143,6 +146,16 @@ export const Sidebar: React.FC = () => {
                   <ChevronRight className="w-3.5 h-3.5 opacity-40" />
                 </NavLink>
 
+                {isActivitiesEnabled && (
+                  <NavLink key="admin-activities" to="/admin/actividades" className={getNavLinkClass}>
+                    <div className="flex items-center gap-3">
+                      <ClipboardList className="w-4 h-4 text-[#4E9F3D]" />
+                      <span>Asignar Actividades</span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 opacity-40" />
+                  </NavLink>
+                )}
+
                 {isHistoryEnabled && (
                   <NavLink key="history" to="/history" className={getNavLinkClass}>
                     <div className="flex items-center gap-3">
@@ -168,7 +181,14 @@ export const Sidebar: React.FC = () => {
                   if (!config && !isRoot) return null;
                   const name = config?.name || modId;
                   const icon = MODULE_ICONS[modId] || <Boxes className="w-4 h-4 text-[#4E9F3D]" />;
-                  const targetPath = modId === 'historial' ? '/history' : `/modules/${modId}`;
+                  // El encargado (subordinado) entra a SU bandeja de actividades;
+                  // el admin/root entra al panel de gestión.
+                  const targetPath =
+                    modId === 'historial'
+                      ? '/history'
+                      : modId === 'actividades' && !isRoot && !isAdmin
+                        ? '/mis-actividades'
+                        : `/modules/${modId}`;
                   const itemKey = modId === 'historial' ? 'history' : `sidebar-module-${modId}`;
 
                   return (

@@ -310,7 +310,6 @@ export const LotesView: React.FC = () => {
   const techSheetReqSeqRef = useRef(0);
   // Modal de selección de galpón para lechones destetados
   const [barnSelectionOpen, setBarnSelectionOpen] = useState(false);
-  const [selectedBarnForWeaned, setSelectedBarnForWeaned] = useState<number | null>(null);
   // Galpones de la granja con capacidad libre >= lechones pendientes
   const weanedAvailableBarns = useMemo(() => {
     if (!weanedSuggestion) return [];
@@ -1402,7 +1401,6 @@ export const LotesView: React.FC = () => {
     // Cierre limpio del modal de animales ANTES de abrir el de
     // selección: nunca deben quedar modales superpuestos
     setIsAnimalsModalOpen(false);
-    setSelectedBarnForWeaned(null);
     setBarnSelectionOpen(true);
   };
 
@@ -1413,7 +1411,6 @@ export const LotesView: React.FC = () => {
     if (!weanedSuggestion) return;
     setBarnSelectionOpen(false);
     setIsAnimalsModalOpen(false);
-    setSelectedBarnForWeaned(barnId);
     setFormGalponId(String(barnId));
     const barn = barnsList.find((b) => String(b.id) === String(barnId));
     if (barn?.species_id) {
