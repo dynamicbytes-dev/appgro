@@ -1,0 +1,235 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Layers,
+  Package,
+  RefreshCw,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
+import { inventoryService } from '../../services/inventoryService';
+import { safeText } from '../../utils/safeText';
+import {
+  INVENTORY_ALERT_LABELS,
+  type InventoryAlerts,
+  type InventoryItem,
+} from '../../types/inventory';
+import { ALERT_BADGE_VARIANT, formatDate, formatMoney, formatQtyWithUnit, toNumber } from './inventoryShared';
+
+interface InventoryPanelTabProps {
+  isAdmin: boolean;
+}
+
+type AlertSectionKey = keyof InventoryAlerts;
+
+const EMPTY_ALERTS: InventoryAlerts = {
+  low_stock: [],
+  over_stock: [],
+  expiring: [],
+  expired: [],
+};
+
+const SECTION_META: Record<
+  AlertSectionKey,
+  { title: string; description: string; icon: React.ReactNode; accent: string }
+> = {
+  low_stock: {
+    title: 'Bajo mínimo',
+    description: 'Insumos que alcanzaron el stock mínimo — requieren compra.',
+    icon: <TrendingDown className="w-4 h-4 text-red-600 dark:text-red-400" />,
+    accent: 'border-l-red-500',
+  },
+  over_stock: {
+    title: 'Sobre stock',
+    description: 'Insumos por encima del máximo — posible merma.',
+    icon: <TrendingUp className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+    accent: 'border-l-amber-500',
+  },
+  expiring: {
+    title: 'Por vencer',
+    description: 'Insumos que vencen en los próximos 15 días.',
+    icon: <CalendarClock className="w-4 h-4 text-amber-600 dark:text-amber-400" />,
+    accent: 'border-l-amber-500',
+  },
+  expired: {
+    title: 'Vencidos',
+    description: 'Insumos cuya fecha de vencimiento ya pasó.',
+    icon: <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />,
+    accent: 'border-l-red-500',
+  },
+};
+
+export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin }) => {
+  const { user, activeFarm } = useAuth();
+
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [alerts, setAlerts] = useState<InventoryAlerts>(EMPTY_ALERTS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const farmId = (activeFarm?.id as number) || (user?.farm_id as number) || undefined;
+
+  const loadPanel = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const [itemsResult, alertsResult] = await Promise.all([
+        isAdmin ? inventoryService.getAll({ farm_id: farmId }) : inventoryService.getMy(),
+        inventoryService.getAlerts(farmId),
+      ]);
+
+      setItems(Array.isArray(itemsResult.data) ? itemsResult.data : []);
+      setAlerts(alertsResult ?? EMPTY_ALERTS);
+    } catch (error: any) {
+      setErrorMessage(error?.response?.data?.message || 'No se pudo cargar el panel de inventario.');
+      setItems([]);
+      setAlerts(EMPTY_ALERTS);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAdmin, farmId]);
+
+  useEffect(() => {
+    void loadPanel();
+  }, [loadPanel]);
+
+  const stats = useMemo(() => {
+    const totalValue = items.reduce((sum, item) => sum + toNumber(item.total_cost), 0);
+    const low = items.filter((item) => (item.alert_flags ?? []).includes('bajo_minimo')).length;
+    const over = items.filter((item) => (item.alert_flags ?? []).includes('sobre_stock')).length;
+    const expiring = items.filter((item) => (item.alert_flags ?? []).includes('por_vencer')).length;
+    const expired = items.filter((item) => (item.alert_flags ?? []).includes('vencido')).length;
+
+    return { total: items.length, totalValue, low, over, expiring, expired };
+  }, [items]);
+
+  const kpiCards = [
+    { label: 'Insumos totales', value: String(stats.total), icon: Package, color: 'text-[#1B4D3E] dark:text-[#6DBF5C]', bg: 'bg-[#1B4D3E]/10' },
+    { label: 'Valor del inventario', value: formatMoney(stats.totalValue), icon: Wallet, color: 'text-[#4E9F3D]', bg: 'bg-[#4E9F3D]/10' },
+    { label: 'Bajo mínimo', value: String(stats.low), icon: TrendingDown, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
+    { label: 'Sobre stock', value: String(stats.over), icon: TrendingUp, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+    { label: 'Por vencer', value: String(stats.expiring), icon: CalendarClock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+    { label: 'Vencidos', value: String(stats.expired), icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
+  ];
+
+  const sectionKeys: AlertSectionKey[] = ['low_stock', 'over_stock', 'expiring', 'expired'];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-end">
+        <Button variant="outline" onClick={() => void loadPanel()} icon={<RefreshCw className="w-4 h-4" />}>
+          Actualizar
+        </Button>
+      </div>
+
+      {errorMessage && (
+        <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm">
+          {errorMessage}
+        </div>
+      )}
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {kpiCards.map((card) => (
+          <Card key={card.label} className="p-4!">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl ${card.bg} flex items-center justify-center shrink-0`}>
+                <card.icon className={`w-5 h-5 ${card.color}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-extrabold text-[#1E1E1E] dark:text-gray-100 truncate">{card.value}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {card.label}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Alertas */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-gray-400">
+          <RefreshCw className="w-6 h-6 animate-spin" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {sectionKeys.map((key) => {
+            const meta = SECTION_META[key];
+            const list = alerts[key] ?? [];
+
+            return (
+              <Card key={key} className={`border-l-4 ${meta.accent}`}>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
+                      {meta.icon}
+                      {meta.title}
+                      <Badge variant="primary" className="text-[10px]!">
+                        {list.length}
+                      </Badge>
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{meta.description}</p>
+                  </div>
+                </div>
+
+                {list.length === 0 ? (
+                  <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 py-3">
+                    <CheckCircle2 className="w-4 h-4 text-[#4E9F3D]" />
+                    Sin incidencias en esta categoría.
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-gray-100 dark:divide-[#263632]">
+                    {list.map((item) => (
+                      <li key={item.id} className="py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[11px] font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
+                              {safeText(item.code, '')}
+                            </span>
+                            {(item.alert_flags ?? []).map((flag) => (
+                              <Badge key={flag} variant={ALERT_BADGE_VARIANT[flag] ?? 'warning'} className="text-[10px]!">
+                                {INVENTORY_ALERT_LABELS[flag] ?? flag}
+                              </Badge>
+                            ))}
+                          </div>
+                          <p className="text-sm text-gray-700 dark:text-gray-200 truncate">
+                            {safeText(item.name, `Insumo #${item.id}`)}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-bold text-[#1E1E1E] dark:text-gray-100">
+                            {formatQtyWithUnit(item.current_stock, item.unit)}
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            {formatDate(item.expiration_date)}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Nota de alcance */}
+      <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+        <Layers className="w-3.5 h-3.5" />
+        Límite de aviso de vencimiento: 15 días. La alerta de compra se notifica al administrador de la granja.
+      </div>
+    </div>
+  );
+};
+
+export default InventoryPanelTab;

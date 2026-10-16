@@ -53,6 +53,7 @@ export const OFFICIAL_FARM_MODULES: SystemModule[] = [
   { id: 3, code: 'barns', name: 'Galpones', description: 'Control de galpones, corrales e infraestructura', is_enabled: true },
   { id: 4, code: 'lots', name: 'Lotes', description: 'Gestión de lotes de producción y capacidad de alojamiento', is_enabled: true },
   { id: 5, code: 'activities', name: 'Actividades', description: 'Registro de tareas de campo, alimentación y controles sanitarios', is_enabled: true },
+  { id: 10, code: 'inventory', name: 'Inventario', description: 'Control de insumos, stock, vencimientos y movimientos', is_enabled: true },
   { id: 6, code: 'analytics', name: 'Analítica', description: 'Reportes, estadísticas e indicadores de rendimiento KPI', is_enabled: true },
   { id: 7, code: 'history', name: 'Historial', description: 'Registro de auditoría, trazabilidad y actividades del sistema', is_enabled: true },
 ];
@@ -287,9 +288,28 @@ export const RootFarmsView: React.FC = () => {
           };
         });
 
+        // Deduplicar por clave canónica: un mismo módulo (p. ej. `barns` y su alias
+        // legacy `galpones`) no debe aparecer dos veces en la grilla de habilitación.
+        const uniqueModules = new Map<string, any>();
+        normalized.forEach((item) => {
+          const key = normalizeModuleCode(item.code) || String(item.code);
+          const current = uniqueModules.get(key);
+          if (!current) {
+            uniqueModules.set(key, item);
+            return;
+          }
+          // Preferir el módulo habilitado; en empate, el de menor id.
+          const preferIncoming =
+            (item.is_enabled && !current.is_enabled) ||
+            (item.is_enabled === current.is_enabled && item.id < current.id);
+          if (preferIncoming) uniqueModules.set(key, item);
+        });
+
+        const dedupedModules = Array.from(uniqueModules.values());
+
         // Ordenamiento estable por ID
-        normalized.sort((a, b) => a.id - b.id);
-        setFarmModules(normalized);
+        dedupedModules.sort((a, b) => a.id - b.id);
+        setFarmModules(dedupedModules);
       } else {
         setFarmModules(OFFICIAL_FARM_MODULES);
       }

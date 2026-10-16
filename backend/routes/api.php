@@ -7,6 +7,10 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BarnController;
 use App\Http\Controllers\GalponController;
 use App\Http\Controllers\HistoryController;
+use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryMovementController;
+use App\Http\Controllers\InventorySupplierController;
+use App\Http\Controllers\InventoryWarehouseController;
 use App\Http\Controllers\LotController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Root\RootAdminController;
@@ -282,6 +286,68 @@ $registerRoutes = function () {
             Route::patch('{id}', [ActivityController::class, 'update']);
             Route::patch('{id}/status', [ActivityController::class, 'updateStatus']);
             Route::delete('{id}', [ActivityController::class, 'destroy']);
+        });
+
+        // Inventario Module ('inventory' / alias 'inventario')
+        Route::middleware('module.access:inventory')->prefix('inventory')->group(function () {
+            Route::get('stats', [InventoryController::class, 'stats']);
+            Route::get('alerts', [InventoryController::class, 'alerts']);
+            Route::get('my', [InventoryController::class, 'my']);
+
+            // Movimientos (antes de {id} para que no los capture la ruta dinámica)
+            Route::get('movements', [InventoryMovementController::class, 'index']);
+            Route::post('movements', [InventoryMovementController::class, 'store']);
+
+            // Catálogos auxiliares: proveedores y bodegas
+            Route::get('suppliers', [InventorySupplierController::class, 'index']);
+            Route::post('suppliers', [InventorySupplierController::class, 'store']);
+            Route::put('suppliers/{id}', [InventorySupplierController::class, 'update']);
+            Route::patch('suppliers/{id}', [InventorySupplierController::class, 'update']);
+            Route::delete('suppliers/{id}', [InventorySupplierController::class, 'destroy']);
+
+            Route::get('warehouses', [InventoryWarehouseController::class, 'index']);
+            Route::post('warehouses', [InventoryWarehouseController::class, 'store']);
+            Route::put('warehouses/{id}', [InventoryWarehouseController::class, 'update']);
+            Route::patch('warehouses/{id}', [InventoryWarehouseController::class, 'update']);
+            Route::delete('warehouses/{id}', [InventoryWarehouseController::class, 'destroy']);
+
+            Route::get('/', [InventoryController::class, 'index']);
+            Route::post('/', [InventoryController::class, 'store']);
+            Route::get('{id}', [InventoryController::class, 'show']);
+            Route::put('{id}', [InventoryController::class, 'update']);
+            Route::patch('{id}', [InventoryController::class, 'update']);
+            Route::delete('{id}', [InventoryController::class, 'destroy']);
+        });
+        Route::middleware('module.access:inventory')->get('admin/inventory/stats', [InventoryController::class, 'stats']);
+        Route::middleware('module.access:inventory')->get('admin/inventory/alerts', [InventoryController::class, 'alerts']);
+        Route::middleware('module.access:inventory')->get('admin/inventory', [InventoryController::class, 'index']);
+
+        // Alias 'inventario' para compatibilidad con el frontend
+        Route::middleware('module.access:inventario')->prefix('inventario')->group(function () {
+            Route::get('stats', [InventoryController::class, 'stats']);
+            Route::get('alerts', [InventoryController::class, 'alerts']);
+            Route::get('my', [InventoryController::class, 'my']);
+            Route::get('movements', [InventoryMovementController::class, 'index']);
+            Route::post('movements', [InventoryMovementController::class, 'store']);
+
+            // Catálogos auxiliares: proveedores y bodegas
+            Route::get('suppliers', [InventorySupplierController::class, 'index']);
+            Route::post('suppliers', [InventorySupplierController::class, 'store']);
+            Route::put('suppliers/{id}', [InventorySupplierController::class, 'update']);
+            Route::patch('suppliers/{id}', [InventorySupplierController::class, 'update']);
+            Route::delete('suppliers/{id}', [InventorySupplierController::class, 'destroy']);
+
+            Route::get('warehouses', [InventoryWarehouseController::class, 'index']);
+            Route::post('warehouses', [InventoryWarehouseController::class, 'store']);
+            Route::put('warehouses/{id}', [InventoryWarehouseController::class, 'update']);
+            Route::patch('warehouses/{id}', [InventoryWarehouseController::class, 'update']);
+            Route::delete('warehouses/{id}', [InventoryWarehouseController::class, 'destroy']);
+            Route::get('/', [InventoryController::class, 'index']);
+            Route::post('/', [InventoryController::class, 'store']);
+            Route::get('{id}', [InventoryController::class, 'show']);
+            Route::put('{id}', [InventoryController::class, 'update']);
+            Route::patch('{id}', [InventoryController::class, 'update']);
+            Route::delete('{id}', [InventoryController::class, 'destroy']);
         });
 
         // Bandeja de notificaciones del usuario (solo JWT, sin module.access:

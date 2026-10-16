@@ -37,6 +37,8 @@ export interface Activity {
   updated_at?: string | null;
   assignee?: ActivityUser | null;
   creator?: ActivityUser | null;
+  farm?: { id: number; name?: string } | null;
+  farm_name?: string | null;
 }
 
 export interface ActivityStats {

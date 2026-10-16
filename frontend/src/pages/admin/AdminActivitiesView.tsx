@@ -22,7 +22,9 @@ import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { activityService } from '../../services/activityService';
 import { subordinateService } from '../../services/subordinateService';
+import { farmService } from '../../services/farmService';
 import { safeText } from '../../utils/safeText';
+import type { Farm } from '../../types/auth';
 import {
   ACTIVITY_STATUS_LABELS,
   type Activity,
@@ -58,6 +60,18 @@ const formatDate = (iso?: string | null): string => {
 const fullName = (user?: { name: string; lastname?: string | null } | null): string =>
   user ? `${safeText(user.name, '')} ${safeText(user.lastname ?? '', '')}`.trim() || 'Sin asignar' : 'Sin asignar';
 
+/** Normaliza la lista de subordinados que devuelve el backend. */
+const normalizeSubordinates = (list: any[]): SubordinateOption[] =>
+  (Array.isArray(list) ? list : [])
+    .filter((sub: any) => sub?.is_active === undefined || sub.is_active === true || sub.is_active === 1)
+    .map((sub: any) => ({
+      id: Number(sub.id),
+      name: safeText(sub.name, `Subordinado #${sub.id}`),
+      lastname: sub.lastname ?? null,
+      email: sub.email,
+    }))
+    .filter((sub: SubordinateOption) => !Number.isNaN(sub.id));
+
 /**
  * Panel del administrador: creación, listado y seguimiento de las
  * actividades de su personal. El módulo 'actividades' debe estar
@@ -69,7 +83,10 @@ export const AdminActivitiesView: React.FC = () => {
 
   const [activities, setActivities] = useState<Activity[]>([]);
   const [stats, setStats] = useState<ActivityStats | null>(null);
-  const [subordinates, setSubordinates] = useState<SubordinateOption[]>([]);
+  const [filterSubordinates, setFilterSubordinates] = useState<SubordinateOption[]>([]);
+  const [formSubordinates, setFormSubordinates] = useState<SubordinateOption[]>([]);
+  const [farmOptions, setFarmOptions] = useState<Farm[]>([]);
+  const [farmFilter, setFarmFilter] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -83,26 +100,38 @@ export const AdminActivitiesView: React.FC = () => {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [form, setForm] = useState({ title: '', description: '', due_date: '', assigned_to: '' });
+  const [form, setForm] = useState({ title: '', description: '', due_date: '', assigned_to: '', farm_id: '' });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const isAdmin = user?.role === 'admin' || user?.role === 'ADMIN';
+  const isRoot = user?.role === 'root' || user?.role === 'ROOT';
+  const canManageActivities = isAdmin || isRoot;
 
-  const loadSubordinates = useCallback(async () => {
+  /** Nombre legible de una granja por su id (con respaldo desde la actividad). */
+  const farmNameOf = (farmId?: number | string | null, fallback?: string | null): string => {
+    const found = farmOptions.find((f) => String(f.id) === String(farmId));
+    return found?.name || fallback || (farmId ? `Granja #${farmId}` : '—');
+  };
+
+  // Subordinados para el filtro de la vista (root: según la granja seleccionada;
+  // admin: los de su propia granja). Sin granja → el backend devuelve todos.
+  const loadFilterSubordinates = useCallback(async () => {
     try {
-      const list = await subordinateService.getAllSubordinates();
-      const normalized = (Array.isArray(list) ? list : [])
-        .filter((sub: any) => sub?.is_active === undefined || sub.is_active === true || sub.is_active === 1)
-        .map((sub: any) => ({
-          id: Number(sub.id),
-          name: safeText(sub.name, `Subordinado #${sub.id}`),
-          lastname: sub.lastname ?? null,
-          email: sub.email,
-        }))
-        .filter((sub: SubordinateOption) => !Number.isNaN(sub.id));
-      setSubordinates(normalized);
+      const scope = isRoot && farmFilter !== 'all' ? farmFilter : undefined;
+      const list = await subordinateService.getAllSubordinates(scope);
+      setFilterSubordinates(normalizeSubordinates(list));
     } catch {
-      setSubordinates([]);
+      setFilterSubordinates([]);
+    }
+  }, [isRoot, farmFilter]);
+
+  // Subordinados para el modal de creación/edición, acotados a la granja elegida.
+  const loadFormSubordinates = useCallback(async (farmId?: number | string | null) => {
+    try {
+      const list = await subordinateService.getAllSubordinates(farmId ?? undefined);
+      setFormSubordinates(normalizeSubordinates(list));
+    } catch {
+      setFormSubordinates([]);
     }
   }, []);
 
@@ -111,11 +140,16 @@ export const AdminActivitiesView: React.FC = () => {
     setErrorMessage('');
 
     try {
+      // Root: sin filtro (o "all") ve TODAS las granjas. Admin: siempre la suya.
+      const farmScope = isRoot
+        ? (farmFilter !== 'all' ? farmFilter : undefined)
+        : ((activeFarm?.id as number) || (user?.farm_id as number) || undefined);
+
       const result = await activityService.getAll({
         status: statusFilter || undefined,
         assigned_to: assigneeFilter || undefined,
         search: searchTerm || undefined,
-        farm_id: (activeFarm?.id as number) || (user?.farm_id as number) || undefined,
+        farm_id: farmScope,
       });
 
       setActivities(Array.isArray(result.data) ? result.data : []);
@@ -128,15 +162,28 @@ export const AdminActivitiesView: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [statusFilter, assigneeFilter, searchTerm, activeFarm?.id, user?.farm_id]);
+  }, [statusFilter, assigneeFilter, searchTerm, isRoot, farmFilter, activeFarm?.id, user?.farm_id]);
 
   useEffect(() => {
     void loadActivities();
   }, [loadActivities]);
 
   useEffect(() => {
-    void loadSubordinates();
-  }, [loadSubordinates]);
+    void loadFilterSubordinates();
+  }, [loadFilterSubordinates]);
+
+  // Catálogo de granjas para el root (selector de la vista y modal de creación).
+  useEffect(() => {
+    if (!isRoot) return;
+    let cancelled = false;
+    (async () => {
+      const farms = await farmService.getFarmsSelect();
+      if (!cancelled) setFarmOptions(farms);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isRoot]);
 
   const filteredActivities = useMemo(() => {
     if (!searchTerm && !statusFilter && !assigneeFilter) return activities;
@@ -154,9 +201,13 @@ export const AdminActivitiesView: React.FC = () => {
   }, [activities, searchTerm, statusFilter, assigneeFilter]);
 
   const openCreateModal = () => {
-    setForm({ title: '', description: '', due_date: '', assigned_to: '' });
+    const defaultFarmId = isRoot
+      ? (farmFilter !== 'all' ? farmFilter : (farmOptions[0] ? String(farmOptions[0].id) : ''))
+      : '';
+    setForm({ title: '', description: '', due_date: '', assigned_to: '', farm_id: defaultFarmId });
     setFormErrors({});
     setSelectedActivity(null);
+    void loadFormSubordinates(isRoot ? (defaultFarmId || undefined) : undefined);
     setIsFormModalOpen(true);
   };
 
@@ -166,9 +217,11 @@ export const AdminActivitiesView: React.FC = () => {
       description: activity.description ?? '',
       due_date: (activity.due_date ?? '').split('T')[0],
       assigned_to: String(activity.assigned_to),
+      farm_id: String(activity.farm_id ?? ''),
     });
     setFormErrors({});
     setSelectedActivity(activity);
+    void loadFormSubordinates(activity.farm_id);
     setIsFormModalOpen(true);
   };
 
@@ -178,6 +231,7 @@ export const AdminActivitiesView: React.FC = () => {
     if (!form.title.trim()) errors.title = 'El título es obligatorio.';
     if (!form.due_date) errors.due_date = 'La fecha límite es obligatoria.';
     if (!form.assigned_to) errors.assigned_to = 'Debe seleccionar un subordinado.';
+    if (isRoot && !form.farm_id) errors.farm_id = 'Debe seleccionar una granja.';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -203,6 +257,7 @@ export const AdminActivitiesView: React.FC = () => {
           description: form.description.trim() || null,
           due_date: form.due_date,
           assigned_to: Number(form.assigned_to),
+          ...(isRoot && form.farm_id ? { farm_id: Number(form.farm_id) } : {}),
         });
         toastSuccess(
           'Actividad asignada',
@@ -282,7 +337,7 @@ export const AdminActivitiesView: React.FC = () => {
           <Button variant="outline" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
             Actualizar
           </Button>
-          {isAdmin && (
+          {canManageActivities && (
             <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
               Nueva Actividad
             </Button>
@@ -311,7 +366,7 @@ export const AdminActivitiesView: React.FC = () => {
 
       {/* Filtros */}
       <Card>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className={`grid grid-cols-1 ${isRoot ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3`}>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -323,6 +378,17 @@ export const AdminActivitiesView: React.FC = () => {
             />
           </div>
 
+          {isRoot && (
+            <select value={farmFilter} onChange={(e) => setFarmFilter(e.target.value)} className={inputClasses}>
+              <option value="all">Todas las granjas</option>
+              {farmOptions.map((farm) => (
+                <option key={farm.id} value={farm.id}>
+                  {safeText(farm.name, `Granja #${farm.id}`)}
+                </option>
+              ))}
+            </select>
+          )}
+
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inputClasses}>
             <option value="">Todos los estados</option>
             <option value="pendiente">Pendiente</option>
@@ -332,7 +398,7 @@ export const AdminActivitiesView: React.FC = () => {
 
           <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={inputClasses}>
             <option value="">Todo el personal</option>
-            {subordinates.map((subordinate) => (
+            {filterSubordinates.map((subordinate) => (
               <option key={subordinate.id} value={subordinate.id}>
                 {safeText(subordinate.name, `Subordinado #${subordinate.id}`)} {safeText(subordinate.lastname ?? '', '')}
               </option>
@@ -366,6 +432,7 @@ export const AdminActivitiesView: React.FC = () => {
                 <tr className="bg-gray-50 dark:bg-[#263632] text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-300">
                   <th className="px-4 py-3 font-bold">Actividad</th>
                   <th className="px-4 py-3 font-bold">Asignada a</th>
+                  {isRoot && <th className="px-4 py-3 font-bold">Granja</th>}
                   <th className="px-4 py-3 font-bold">Fecha límite</th>
                   <th className="px-4 py-3 font-bold">Estado</th>
                   <th className="px-4 py-3 font-bold text-right">Acciones</th>
@@ -390,6 +457,11 @@ export const AdminActivitiesView: React.FC = () => {
                     <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
                       {safeText(fullName(activity.assignee), 'Sin asignar')}
                     </td>
+                    {isRoot && (
+                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                        {safeText(activity.farm_name ?? activity.farm?.name ?? '—', '—')}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-gray-700 dark:text-gray-200">{formatDate(activity.due_date)}</span>
@@ -418,7 +490,7 @@ export const AdminActivitiesView: React.FC = () => {
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        {isAdmin && activity.status !== 'terminada' && (
+                        {canManageActivities && activity.status !== 'terminada' && (
                           <>
                             <button
                               onClick={() => openEditModal(activity)}
@@ -487,6 +559,41 @@ export const AdminActivitiesView: React.FC = () => {
             {formErrors.description && <p className="text-xs text-red-600 mt-1">{formErrors.description}</p>}
           </div>
 
+          {isRoot && (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
+                Granja {selectedActivity ? '' : '*'}
+              </label>
+              {selectedActivity ? (
+                <input
+                  type="text"
+                  value={farmNameOf(selectedActivity.farm_id, selectedActivity.farm_name)}
+                  disabled
+                  className={`${inputClasses} opacity-70 cursor-not-allowed`}
+                />
+              ) : (
+                <select
+                  value={form.farm_id}
+                  onChange={(e) => {
+                    setForm({ ...form, farm_id: e.target.value, assigned_to: '' });
+                    void loadFormSubordinates(e.target.value || undefined);
+                  }}
+                  className={inputClasses}
+                >
+                  <option value="">Seleccionar granja...</option>
+                  {farmOptions.map((farm) => (
+                    <option key={farm.id} value={farm.id}>
+                      {safeText(farm.name, `Granja #${farm.id}`)}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {!selectedActivity && formErrors.farm_id && (
+                <p className="text-xs text-red-600 mt-1">{formErrors.farm_id}</p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
@@ -512,14 +619,14 @@ export const AdminActivitiesView: React.FC = () => {
                 className={inputClasses}
               >
                 <option value="">Seleccionar encargado...</option>
-                {subordinates.map((subordinate) => (
+                {formSubordinates.map((subordinate) => (
                   <option key={subordinate.id} value={subordinate.id}>
                     {safeText(subordinate.name, `Subordinado #${subordinate.id}`)} {safeText(subordinate.lastname ?? '', '')}
                   </option>
                 ))}
               </select>
               {formErrors.assigned_to && <p className="text-xs text-red-600 mt-1">{formErrors.assigned_to}</p>}
-              {subordinates.length === 0 && (
+              {formSubordinates.length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">
                   No hay encargados activos en tu granja. Crea uno desde «Encargados».
                 </p>
@@ -622,7 +729,7 @@ export const AdminActivitiesView: React.FC = () => {
             )}
 
             {/* Acciones rápidas de estado (solo si no está terminada) */}
-            {isAdmin && selectedActivity.status !== 'terminada' && (
+            {canManageActivities && selectedActivity.status !== 'terminada' && (
               <div className="pt-3 border-t border-gray-100 dark:border-[#263632]">
                 <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
                   Cambiar estado manualmente

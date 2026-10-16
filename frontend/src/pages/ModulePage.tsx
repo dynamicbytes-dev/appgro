@@ -43,6 +43,7 @@ import { SpeciesView } from './SpeciesView';
 import { GalponesView } from './GalponesView';
 import { LotesView } from './LotesView';
 import { AdminActivitiesView } from './admin/AdminActivitiesView';
+import { InventoryView } from './inventory/InventoryView';
 
 interface ModuleRecord {
   id: string;
@@ -107,6 +108,8 @@ export const ModulePage: React.FC = () => {
   const isLots = (moduleId as string) === 'lotes' || (moduleId as string) === 'lots';
   const isActivities =
     (moduleId as string) === 'actividades' || (moduleId as string) === 'activities';
+  const isInventory =
+    (moduleId as string) === 'inventario' || (moduleId as string) === 'inventory';
 
   // Dynamic records state for current module
   // (los hooks deben ejecutarse antes de cualquier early-return)
@@ -136,6 +139,11 @@ export const ModulePage: React.FC = () => {
   // El módulo de actividades consume la API real (no el genérico en memoria)
   if (moduleId === 'actividades' || (moduleId as string) === 'activities') {
     return <AdminActivitiesView />;
+  }
+
+  // El módulo de inventario consume la API real (no el genérico en memoria)
+  if (isInventory) {
+    return <InventoryView />;
   }
 
   const modConfig = moduleId ? SYSTEM_MODULES[moduleId] : null;

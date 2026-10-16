@@ -15,6 +15,7 @@ import {
   Warehouse,
   Layers,
   ClipboardList,
+  Package,
   BarChart3,
   History,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   galpones: <Warehouse className="w-4 h-4 text-[#4E9F3D]" />,
   lotes: <Boxes className="w-4 h-4 text-[#4E9F3D]" />,
   actividades: <ClipboardList className="w-4 h-4 text-[#4E9F3D]" />,
+  inventario: <Package className="w-4 h-4 text-[#4E9F3D]" />,
   analitica: <BarChart3 className="w-4 h-4 text-[#4E9F3D]" />,
   historial: <History className="w-4 h-4 text-[#4E9F3D]" />,
 };
@@ -64,9 +66,6 @@ export const Sidebar: React.FC = () => {
   const displayModules = isRoot || isAdmin
     ? userModules.filter((m) => m !== 'historial')
     : userModules;
-
-  // ¿El módulo de actividades está habilitado para el usuario/granja?
-  const isActivitiesEnabled = isRoot || userModules.includes('actividades');
 
   const getNavLinkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
@@ -145,16 +144,6 @@ export const Sidebar: React.FC = () => {
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 opacity-40" />
                 </NavLink>
-
-                {isActivitiesEnabled && (
-                  <NavLink key="admin-activities" to="/admin/actividades" className={getNavLinkClass}>
-                    <div className="flex items-center gap-3">
-                      <ClipboardList className="w-4 h-4 text-[#4E9F3D]" />
-                      <span>Asignar Actividades</span>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 opacity-40" />
-                  </NavLink>
-                )}
 
                 {isHistoryEnabled && (
                   <NavLink key="history" to="/history" className={getNavLinkClass}>

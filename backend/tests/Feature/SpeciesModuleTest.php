@@ -826,7 +826,7 @@ class SpeciesModuleTest extends TestCase
 
         // Enable species & galpones modules for the farm
         $speciesMod = Module::where('code', 'species')->first();
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->whereIn('module_id', [$speciesMod->id, $galponMod->id])
             ->update(['is_enabled' => true]);

@@ -466,7 +466,7 @@ class LotesModuleTest extends TestCase
         ]);
 
         // Habilitar el módulo de galpones para leer la ocupación
-        $galponesModule = Module::where('code', 'galpones')->first();
+        $galponesModule = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponesModule->id)
             ->update(['is_enabled' => true]);
@@ -856,7 +856,7 @@ class LotesModuleTest extends TestCase
         // ocupación del galpón desde la API (el mismo
         // endpoint que usa el frontend: occupied_capacity
         // y available_capacity).
-        $galponesModule = Module::where('code', 'galpones')->first();
+        $galponesModule = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponesModule->id)
             ->update(['is_enabled' => true]);
@@ -1101,7 +1101,7 @@ class LotesModuleTest extends TestCase
             ->assertJsonPath('stats.in_production_animals', 5);
 
         // La ocupación del galpón incluye a la cerda gestante
-        $galponesModule = Module::where('code', 'galpones')->first();
+        $galponesModule = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponesModule->id)
             ->update(['is_enabled' => true]);
@@ -1174,7 +1174,7 @@ class LotesModuleTest extends TestCase
         ])->assertStatus(201);
 
         // El módulo de galpones habilitado para consultar cupos
-        $galponesModule = Module::where('code', 'galpones')->first();
+        $galponesModule = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponesModule->id)
             ->update(['is_enabled' => true]);
@@ -1219,7 +1219,7 @@ class LotesModuleTest extends TestCase
             'quantity' => 50,
         ])->assertStatus(201)->json('data.id');
 
-        $galponesModule = Module::where('code', 'galpones')->first();
+        $galponesModule = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponesModule->id)
             ->update(['is_enabled' => true]);
@@ -1301,7 +1301,7 @@ class LotesModuleTest extends TestCase
         $this->assertSame(102, (int) $stats['in_production_animals'], 'Animales en Producción debe contar los animales reales: activos + gestación, incluyendo lotes sin seguimiento individual.');
 
         // Y coincide con la ocupación del galpón
-        $galponesModule = Module::where('code', 'galpones')->first();
+        $galponesModule = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponesModule->id)
             ->update(['is_enabled' => true]);

@@ -78,6 +78,67 @@ class ActivityModuleTest extends TestCase
         ])->json('data.access_token');
     }
 
+    /**
+     * Prepara root + dos granjas, cada una con un subordinado activo y una
+     * actividad. Devuelve [$root, $farmA, $farmB, $subA, $subB, $token].
+     */
+    private function createRootWithTwoFarmActivities(): array
+    {
+        $this->artisan('app:init-root');
+
+        $farmA = Farm::create(['name' => 'Granja Alfa', 'sector' => 'porcino', 'is_active' => true]);
+        $farmB = Farm::create(['name' => 'Granja Beta', 'sector' => 'bovino', 'is_active' => true]);
+
+        $root = User::create([
+            'farm_id' => null,
+            'name' => 'Root Global',
+            'email' => 'root_global@test.com',
+            'password_hash' => Hash::make('password123'),
+            'role' => 'root',
+            'is_active' => true,
+        ]);
+
+        $subA = User::create([
+            'farm_id' => $farmA->id,
+            'name' => 'Sub Alfa',
+            'email' => 'sub_alfa@test.com',
+            'password_hash' => Hash::make('password123'),
+            'role' => 'subordinate',
+            'is_active' => true,
+        ]);
+
+        $subB = User::create([
+            'farm_id' => $farmB->id,
+            'name' => 'Sub Beta',
+            'email' => 'sub_beta@test.com',
+            'password_hash' => Hash::make('password123'),
+            'role' => 'subordinate',
+            'is_active' => true,
+        ]);
+
+        Activity::create([
+            'farm_id' => $farmA->id,
+            'created_by' => $root->id,
+            'assigned_to' => $subA->id,
+            'title' => 'Tarea Alfa',
+            'due_date' => now()->addDay()->toDateString(),
+            'status' => 'pendiente',
+        ]);
+
+        Activity::create([
+            'farm_id' => $farmB->id,
+            'created_by' => $root->id,
+            'assigned_to' => $subB->id,
+            'title' => 'Tarea Beta',
+            'due_date' => now()->addDay()->toDateString(),
+            'status' => 'pendiente',
+        ]);
+
+        $token = $this->loginToken('root_global@test.com');
+
+        return [$root, $farmA, $farmB, $subA, $subB, $token];
+    }
+
     public function test_activities_tables_have_all_required_columns(): void
     {
         $this->assertTrue(Schema::hasTable('activities'), 'Table activities must exist.');
@@ -568,6 +629,91 @@ class ActivityModuleTest extends TestCase
         $titlesB = collect($responseB->json('data'))->pluck('title')->all();
         $this->assertContains('Tarea B', $titlesB);
         $this->assertNotContains('Tarea A', $titlesB);
+    }
+
+    public function test_root_without_farm_id_sees_activities_from_all_farms(): void
+    {
+        [, , , , , $token] = $this->createRootWithTwoFarmActivities();
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/activities')
+            ->assertStatus(200)
+            ->assertJson(['status' => 'success']);
+
+        $titles = collect($response->json('data'))->pluck('title')->all();
+        $this->assertContains('Tarea Alfa', $titles);
+        $this->assertContains('Tarea Beta', $titles, 'El root debe ver actividades de todas las granjas.');
+        $this->assertSame(2, $response->json('stats.total'));
+    }
+
+    public function test_root_with_farm_id_all_sees_every_farm(): void
+    {
+        [, , , , , $token] = $this->createRootWithTwoFarmActivities();
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/activities?farm_id=all')
+            ->assertStatus(200);
+
+        $titles = collect($response->json('data'))->pluck('title')->all();
+        $this->assertContains('Tarea Alfa', $titles);
+        $this->assertContains('Tarea Beta', $titles);
+    }
+
+    public function test_activity_listing_exposes_farm_name_for_root(): void
+    {
+        [, $farmA, , , , $token] = $this->createRootWithTwoFarmActivities();
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->getJson('/api/v1/activities?farm_id='.$farmA->id)
+            ->assertStatus(200);
+
+        $this->assertSame('Granja Alfa', $response->json('data.0.farm_name'));
+        $this->assertSame($farmA->id, $response->json('data.0.farm.id'));
+    }
+
+    public function test_root_can_create_activity_in_any_farm_specifying_farm_id(): void
+    {
+        [, $farmA, $farmB, $subA, $subB, $token] = $this->createRootWithTwoFarmActivities();
+
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/activities', [
+                'farm_id' => $farmB->id,
+                'title' => 'Tarea creada por root en Beta',
+                'due_date' => now()->addDay()->toDateString(),
+                'assigned_to' => $subB->id,
+            ])
+            ->assertStatus(201)
+            ->assertJson(['status' => 'success']);
+
+        $this->assertDatabaseHas('activities', [
+            'id' => $response->json('data.id'),
+            'farm_id' => $farmB->id,
+            'assigned_to' => $subB->id,
+        ]);
+
+        // El encargado asignado debe pertenecer a la granja indicada
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/activities', [
+                'farm_id' => $farmB->id,
+                'title' => 'Cruce de granjas',
+                'due_date' => now()->addDay()->toDateString(),
+                'assigned_to' => $subA->id,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['assigned_to']);
+    }
+
+    public function test_root_can_change_status_of_activity_from_any_farm(): void
+    {
+        [, , , , , $token] = $this->createRootWithTwoFarmActivities();
+
+        $activityB = Activity::where('title', 'Tarea Beta')->firstOrFail();
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->patchJson('/api/v1/activities/'.$activityB->id.'/status', ['status' => 'en_proceso'])
+            ->assertStatus(200);
+
+        $this->assertDatabaseHas('activities', ['id' => $activityB->id, 'status' => 'en_proceso']);
     }
 
     public function test_notifications_endpoint_returns_bell_data_and_marks_read(): void

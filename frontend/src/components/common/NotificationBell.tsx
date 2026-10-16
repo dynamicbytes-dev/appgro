@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Bell, Check, CheckCheck, ClipboardList, Clock } from 'lucide-react';
+import { Bell, Check, CheckCheck, ClipboardList, Clock, Package } from 'lucide-react';
 import { useNotifications } from '../../context/NotificationsContext';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -65,6 +65,11 @@ export const NotificationBell: React.FC = () => {
     const type = notification.data?.type ?? notification.type;
 
     setIsOpen(false);
+
+    if (type === 'inventory_low_stock') {
+      navigate('/modules/inventario');
+      return;
+    }
 
     if (activityId && (type === 'activity_assigned' || type === 'activity_completed')) {
       navigate(activitiesPath);
@@ -134,11 +139,15 @@ export const NotificationBell: React.FC = () => {
                       className={`mt-0.5 shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                         data.type === 'activity_completed'
                           ? 'bg-[#4E9F3D]/15 text-[#4E9F3D]'
-                          : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                          : data.type === 'inventory_low_stock'
+                            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                            : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
                       }`}
                     >
                       {data.type === 'activity_completed' ? (
                         <Check className="w-4 h-4" />
+                      ) : data.type === 'inventory_low_stock' ? (
+                        <Package className="w-4 h-4" />
                       ) : (
                         <ClipboardList className="w-4 h-4" />
                       )}

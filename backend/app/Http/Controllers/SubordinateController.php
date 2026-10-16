@@ -37,6 +37,8 @@ class SubordinateController extends Controller
             'lots' => 'lots',
             'actividades' => 'activities',
             'activities' => 'activities',
+            'inventario' => 'inventory',
+            'inventory' => 'inventory',
             'analitica' => 'analytics',
             'analytics' => 'analytics',
             'historial' => 'history',

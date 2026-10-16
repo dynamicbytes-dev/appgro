@@ -33,10 +33,10 @@ class InitRootCommand extends Command
         // 1. Clean obsolete modules and ensure official system modules exist
         $officialModules = [
             ['code' => 'species', 'name' => 'Especies', 'description' => 'Módulo de Gestión de Especies Pecuarias'],
-            ['code' => 'galpones', 'name' => 'Galpones', 'description' => 'Módulo de Galpones e Instalaciones'],
             ['code' => 'barns', 'name' => 'Galpones', 'description' => 'Módulo de Galpones e Instalaciones'],
             ['code' => 'lots', 'name' => 'Lotes', 'description' => 'Módulo de Lotes de Animales'],
             ['code' => 'activities', 'name' => 'Actividades', 'description' => 'Control y Registro de Actividades Operativas'],
+            ['code' => 'inventory', 'name' => 'Inventario', 'description' => 'Control de Insumos y Movimientos de Inventario'],
             ['code' => 'analytics', 'name' => 'Analítica y Reportes', 'description' => 'Analíticas, Estadísticas y Reportes Agropecuarios'],
             ['code' => 'history', 'name' => 'Historial y Auditoría', 'description' => 'Historial y Registro de Auditoría de Actividades'],
         ];

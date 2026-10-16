@@ -33,6 +33,14 @@ export const SYSTEM_MODULES: Record<ModuleId, ModuleConfig> = {
     category: "operativo",
     roles: ["ADMIN", "ENCARGADO"],
   },
+  inventario: {
+    id: "inventario",
+    name: "Inventario",
+    description: "Control de insumos, stock, vencimientos y movimientos",
+    icon: "Package",
+    category: "operativo",
+    roles: ["ADMIN", "ENCARGADO"],
+  },
   analitica: {
     id: "analitica",
     name: "Analítica",
@@ -61,6 +69,7 @@ export const MODULE_ALIAS_MAP: Record<string, ModuleId> = {
   lot: "lotes",
   activities: "actividades",
   activity: "actividades",
+  inventory: "inventario",
   analytics: "analitica",
   analytic: "analitica",
   history: "historial",
@@ -75,6 +84,7 @@ export const MODULE_ALIAS_MAP: Record<string, ModuleId> = {
   lote: "lotes",
   actividades: "actividades",
   actividad: "actividades",
+  inventario: "inventario",
   analitica: "analitica",
   analítica: "analitica",
   historial: "historial",
@@ -89,6 +99,7 @@ export const MODULE_ALIAS_MAP: Record<string, ModuleId> = {
   "5": "actividades",
   "6": "analitica",
   "7": "historial",
+  "10": "inventario",
 };
 
 export const CODE_TO_MODULE_ID: Record<string, number> = {
@@ -111,6 +122,9 @@ export const CODE_TO_MODULE_ID: Record<string, number> = {
   actividades: 5,
   activity: 5,
   actividad: 5,
+
+  inventory: 10,
+  inventario: 10,
 
   analytics: 6,
   analitica: 6,

@@ -50,6 +50,7 @@ class ActivityController extends Controller
         $query = Activity::query()->with([
             'assignee:id,name,lastname,email',
             'creator:id,name,lastname',
+            'farm:id,name',
         ]);
 
         // Scope: root puede filtrar por farm_id; el resto queda estricto a su granja
@@ -286,6 +287,7 @@ class ActivityController extends Controller
         $activity->load([
             'assignee:id,name,lastname,email',
             'creator:id,name,lastname',
+            'farm:id,name',
         ]);
 
         return response()->json([
@@ -305,6 +307,7 @@ class ActivityController extends Controller
         $activity = Activity::with([
             'assignee:id,name,lastname,email',
             'creator:id,name,lastname',
+            'farm:id,name',
         ])->find($id);
 
         if (!$activity) {
@@ -424,6 +427,7 @@ class ActivityController extends Controller
         $activity->load([
             'assignee:id,name,lastname,email',
             'creator:id,name,lastname',
+            'farm:id,name',
         ]);
 
         return response()->json([
@@ -491,6 +495,7 @@ class ActivityController extends Controller
         $activity->load([
             'assignee:id,name,lastname,email',
             'creator:id,name,lastname',
+            'farm:id,name',
         ]);
 
         return response()->json([
@@ -626,6 +631,9 @@ class ActivityController extends Controller
         return array_merge($activity->toArray(), [
             'status_label' => $activity->statusLabel(),
             'is_overdue' => $activity->isOverdue(),
+            // Nombre de la granja de origen (solo si la relación fue cargada,
+            // para no provocar consultas N+1 en la bandeja del subordinado).
+            'farm_name' => $activity->relationLoaded('farm') ? $activity->farm?->name : null,
         ]);
     }
 

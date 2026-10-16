@@ -35,6 +35,8 @@ class ResetFarmDataCommand extends Command
      *  - barns            → hijo de farms
      *  - species          → hijo de farms
      *  - activities       → hijo de farms / users (tareas asignadas)
+     *  - inventory_movements → hijo de inventory_items / lots / users
+     *  - inventory_items  → hijo de farms / users
      *  - notifications    → hijo de users (canal database)
      *  - activity_logs    → hijo de users / farms
      *
@@ -52,6 +54,8 @@ class ResetFarmDataCommand extends Command
         'barns',
         'species',
         'activities',
+        'inventory_movements',
+        'inventory_items',
         'notifications',
         'activity_logs',
     ];

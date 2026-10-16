@@ -61,6 +61,8 @@ class CheckModuleAccess
                 'historial' => 'history',
                 'actividades' => 'activities',
                 'activities' => 'actividades',
+                'inventario' => 'inventory',
+                'inventory' => 'inventario',
                 default => null,
             };
             if ($alias) {
@@ -86,6 +88,10 @@ class CheckModuleAccess
         }
         if (in_array($module->code, ['activities', 'actividades'])) {
             $equiv = Module::whereIn('code', ['activities', 'actividades'])->pluck('id')->toArray();
+            $equivalentModuleIds = array_unique(array_merge($equivalentModuleIds, $equiv));
+        }
+        if (in_array($module->code, ['inventory', 'inventario'])) {
+            $equiv = Module::whereIn('code', ['inventory', 'inventario'])->pluck('id')->toArray();
             $equivalentModuleIds = array_unique(array_merge($equivalentModuleIds, $equiv));
         }
 

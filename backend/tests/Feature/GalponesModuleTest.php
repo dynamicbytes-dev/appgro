@@ -49,9 +49,15 @@ class GalponesModuleTest extends TestCase
     {
         $this->artisan('app:init-root');
 
-        $module = Module::where('code', 'galpones')->first();
-        $this->assertNotNull($module, "Module with code 'galpones' must be registered in modules table.");
+        $module = Module::where('code', 'barns')->first();
+        $this->assertNotNull($module, "Module with code 'barns' must be registered in modules table.");
         $this->assertEquals('Galpones', $module->name);
+
+        // El alias legacy 'galpones' no debe existir: evita módulos duplicados en la UI.
+        $this->assertNull(
+            Module::where('code', 'galpones')->first(),
+            "El módulo legacy 'galpones' no debe registrarse como duplicado."
+        );
     }
 
     public function test_admin_cannot_access_galpones_if_module_is_disabled_for_farm(): void
@@ -73,11 +79,10 @@ class GalponesModuleTest extends TestCase
             'is_active' => true,
         ]);
 
-        // Explicitly ensure both galpones and barns are disabled
-        $galponModule = Module::where('code', 'galpones')->first();
+        // Explicitly ensure the canonical 'barns' module is disabled
         $barnModule = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
-            ->whereIn('module_id', array_filter([$galponModule?->id, $barnModule?->id]))
+            ->where('module_id', $barnModule->id)
             ->update(['is_enabled' => false]);
 
         $login = $this->postJson('/api/v1/auth/login', [
@@ -105,7 +110,7 @@ class GalponesModuleTest extends TestCase
             'is_active' => true,
         ]);
 
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponMod->id)
             ->update(['is_enabled' => true]);
@@ -199,7 +204,7 @@ class GalponesModuleTest extends TestCase
         $farm1 = Farm::create(['name' => 'Granja Local', 'sector' => 'bovino', 'is_active' => true]);
         $farm2 = Farm::create(['name' => 'Granja Ajena', 'sector' => 'porcino', 'is_active' => true]);
 
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm1->id)->where('module_id', $galponMod->id)->update(['is_enabled' => true]);
 
         $admin = User::create([
@@ -244,7 +249,7 @@ class GalponesModuleTest extends TestCase
         $this->artisan('app:init-root');
 
         $farm = Farm::create(['name' => 'Granja Inactiva Species', 'sector' => 'bovino', 'is_active' => true]);
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)->where('module_id', $galponMod->id)->update(['is_enabled' => true]);
 
         $admin = User::create([
@@ -291,7 +296,7 @@ class GalponesModuleTest extends TestCase
         $farm1 = Farm::create(['name' => 'Granja Aislada 1', 'sector' => 'bovino', 'is_active' => true]);
         $farm2 = Farm::create(['name' => 'Granja Aislada 2', 'sector' => 'porcino', 'is_active' => true]);
 
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::whereIn('farm_id', [$farm1->id, $farm2->id])
             ->where('module_id', $galponMod->id)
             ->update(['is_enabled' => true]);
@@ -401,7 +406,7 @@ class GalponesModuleTest extends TestCase
         $this->artisan('app:init-root');
 
         $farm = Farm::create(['name' => 'Granja KPIs Galpon', 'sector' => 'bovino', 'is_active' => true]);
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)->where('module_id', $galponMod->id)->update(['is_enabled' => true]);
 
         $admin = User::create([
@@ -445,7 +450,7 @@ class GalponesModuleTest extends TestCase
         $this->artisan('app:init-root');
 
         $farm = Farm::create(['name' => 'Granja Toggle Galpon', 'sector' => 'bovino', 'is_active' => true]);
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)->where('module_id', $galponMod->id)->update(['is_enabled' => true]);
 
         $admin = User::create([
@@ -520,7 +525,7 @@ class GalponesModuleTest extends TestCase
         ]);
 
         // Enable module for farmA
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farmA->id)->where('module_id', $galponMod->id)->update(['is_enabled' => true]);
 
         $adminA = User::create([
@@ -584,7 +589,7 @@ class GalponesModuleTest extends TestCase
             'is_active' => true,
         ]);
 
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponMod->id)
             ->update(['is_enabled' => true]);
@@ -658,7 +663,7 @@ class GalponesModuleTest extends TestCase
             'is_active' => true,
         ]);
 
-        $galponMod = Module::where('code', 'galpones')->first();
+        $galponMod = Module::where('code', 'barns')->first();
         FarmModule::where('farm_id', $farm->id)
             ->where('module_id', $galponMod->id)
             ->update(['is_enabled' => true]);

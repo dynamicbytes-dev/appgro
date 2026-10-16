@@ -1,6 +1,6 @@
 export type UserRole = "root" | "admin" | "subordinate" | "ROOT" | "ADMIN" | "ENCARGADO";
 
-export type ModuleId = 'especies' | 'galpones' | 'lotes' | 'actividades' | 'analitica' | 'historial';
+export type ModuleId = 'especies' | 'galpones' | 'lotes' | 'actividades' | 'inventario' | 'analitica' | 'historial';
 
 export interface ModuleConfig {
   id: ModuleId;
