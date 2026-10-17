@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  Building2,
   History,
   Plus,
   RefreshCw,
@@ -13,6 +14,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { inventoryService } from '../../services/inventoryService';
 import { safeText } from '../../utils/safeText';
+import type { Farm } from '../../types/auth';
 import {
   INVENTORY_MOVEMENT_LABELS,
   INVENTORY_MOVEMENT_TYPES,
@@ -31,8 +33,12 @@ import {
 } from './inventoryShared';
 import { InventoryMovementModal } from './InventoryMovementModal';
 
-interface InventoryMovementsTabProps {
+export interface InventoryMovementsTabProps {
   isAdmin: boolean;
+  isRoot?: boolean;
+  selectedFarmId?: string;
+  setSelectedFarmId?: (id: string) => void;
+  availableFarms?: Farm[];
 }
 
 const TYPE_ICON: Record<InventoryMovementType, React.ReactNode> = {
@@ -55,7 +61,11 @@ const signedQty = (movement: InventoryMovement): string => {
   return `${n > 0 ? '+' : ''}${formatQty(n)}${suffix}`;
 };
 
-export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ isAdmin }) => {
+export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({
+  isAdmin,
+  isRoot = false,
+  selectedFarmId = 'all',
+}) => {
   const { user, activeFarm } = useAuth();
 
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
@@ -67,16 +77,20 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
   const [typeFilter, setTypeFilter] = useState('');
   const [itemFilter, setItemFilter] = useState('');
 
-  const farmId = (activeFarm?.id as number) || (user?.farm_id as number) || undefined;
+  const defaultFarmId = (activeFarm?.id as number) || (user?.farm_id as number) || undefined;
+  const effectiveFarmId = isRoot ? selectedFarmId : defaultFarmId;
+  const showFarmColumn = Boolean(isRoot);
 
   const loadItems = useCallback(async () => {
     try {
-      const result = isAdmin ? await inventoryService.getAll({ farm_id: farmId }) : await inventoryService.getMy();
+      const result = isAdmin
+        ? await inventoryService.getAll({ farm_id: effectiveFarmId })
+        : await inventoryService.getMy();
       setItems(Array.isArray(result.data) ? result.data : []);
     } catch {
       setItems([]);
     }
-  }, [isAdmin, farmId]);
+  }, [isAdmin, effectiveFarmId]);
 
   const loadMovements = useCallback(async () => {
     setIsLoading(true);
@@ -86,7 +100,7 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
       const result = await inventoryService.getMovements({
         type: typeFilter || undefined,
         inventory_item_id: itemFilter || undefined,
-        farm_id: farmId,
+        farm_id: effectiveFarmId,
       });
       setMovements(Array.isArray(result) ? result : []);
     } catch (error: any) {
@@ -95,7 +109,7 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
     } finally {
       setIsLoading(false);
     }
-  }, [typeFilter, itemFilter, farmId]);
+  }, [typeFilter, itemFilter, effectiveFarmId]);
 
   useEffect(() => {
     void loadItems();
@@ -151,6 +165,7 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
               </Button>
               <Button
                 variant="accent"
+                size="sm"
                 onClick={() => setIsMovementModalOpen(true)}
                 icon={<Plus className="w-4 h-4" />}
               >
@@ -205,6 +220,7 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
               <thead>
                 <tr className="bg-gray-50 dark:bg-[#263632] text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-300">
                   <th className="px-4 py-3 font-bold">Fecha & hora</th>
+                  {showFarmColumn ? <th className="px-4 py-3 font-bold">Granja</th> : null}
                   <th className="px-4 py-3 font-bold">Insumo</th>
                   <th className="px-4 py-3 font-bold">Tipo</th>
                   <th className="px-4 py-3 font-bold">Cantidad</th>
@@ -222,6 +238,16 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({ is
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
                         {formatDateTime(movement.movement_date ?? movement.created_at)}
                       </td>
+                      {showFarmColumn ? (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-[#064E3B] dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60 shadow-xs">
+                            <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="truncate max-w-[130px]" title={movement.farm?.name || movement.farm_name || 'Granja'}>
+                              {movement.farm?.name || movement.farm_name || 'Granja'}
+                            </span>
+                          </span>
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 max-w-[200px]">
                         <span className="font-mono text-[11px] font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
                           {safeText(movement.item_code ?? movement.item?.code ?? '', '')}

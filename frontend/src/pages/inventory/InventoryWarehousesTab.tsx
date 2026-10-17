@@ -216,7 +216,7 @@ export const InventoryWarehousesTab: React.FC<InventoryWarehousesTabProps> = ({ 
             </div>
 
             {isAdmin && (
-              <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
+              <Button variant="accent" size="sm" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
                 Nueva Bodega
               </Button>
             )}

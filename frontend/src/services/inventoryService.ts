@@ -28,7 +28,7 @@ const buildItemQuery = (params?: InventoryFilters): Record<string, string | numb
   if (params?.search) query.search = params.search;
   if (params?.category) query.category = params.category;
   if (params?.alert) query.alert = params.alert;
-  if (params?.farm_id && params.farm_id !== 'all') query.farm_id = params.farm_id;
+  if (params?.farm_id !== undefined && params.farm_id !== '') query.farm_id = params.farm_id;
   return query;
 };
 
@@ -36,7 +36,7 @@ const buildCatalogQuery = (params?: InventoryCatalogFilters): Record<string, str
   const query: Record<string, string | number> = {};
   if (params?.search) query.search = params.search;
   if (params?.is_active !== undefined) query.is_active = params.is_active ? 1 : 0;
-  if (params?.farm_id && params.farm_id !== 'all') query.farm_id = params.farm_id;
+  if (params?.farm_id !== undefined && params.farm_id !== '') query.farm_id = params.farm_id;
   return query;
 };
 
@@ -117,7 +117,7 @@ export const inventoryService = {
    */
   getStats: async (farmId?: number | string): Promise<InventoryStats> => {
     const response = await api.get('/inventory/stats', {
-      params: farmId && farmId !== 'all' ? { farm_id: farmId } : undefined,
+      params: farmId !== undefined && farmId !== '' ? { farm_id: farmId } : undefined,
     });
     return response.data?.data ?? response.data;
   },
@@ -127,7 +127,7 @@ export const inventoryService = {
    */
   getAlerts: async (farmId?: number | string): Promise<InventoryAlerts> => {
     const response = await api.get('/inventory/alerts', {
-      params: farmId && farmId !== 'all' ? { farm_id: farmId } : undefined,
+      params: farmId !== undefined && farmId !== '' ? { farm_id: farmId } : undefined,
     });
     return (
       response.data?.data ?? {
@@ -150,7 +150,7 @@ export const inventoryService = {
     if (params?.inventory_lot_id) query.inventory_lot_id = params.inventory_lot_id;
     if (params?.from) query.from = params.from;
     if (params?.to) query.to = params.to;
-    if (params?.farm_id && params.farm_id !== 'all') query.farm_id = params.farm_id;
+    if (params?.farm_id !== undefined && params.farm_id !== '') query.farm_id = params.farm_id;
 
     const response = await api.get('/inventory/movements', { params: query });
     return response.data?.data ?? [];
@@ -224,7 +224,7 @@ export const inventoryService = {
     const query: Record<string, string | number> = {};
     if (params?.search) query.search = params.search;
     if (params?.inventory_item_id) query.inventory_item_id = params.inventory_item_id;
-    if (params?.farm_id && params.farm_id !== 'all') query.farm_id = params.farm_id;
+    if (params?.farm_id !== undefined && params.farm_id !== '') query.farm_id = params.farm_id;
 
     const response = await api.get('/inventory/lots', { params: query });
     return response.data?.data ?? [];

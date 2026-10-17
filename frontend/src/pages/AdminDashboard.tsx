@@ -7,6 +7,7 @@ import { tokenStorage, api } from '../services/api';
 import { subordinateService } from '../services/subordinateService';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
@@ -406,30 +407,21 @@ export const AdminDashboard: React.FC = () => {
     <div className="space-y-6">
       
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-[#1B4D3E] via-[#143A2F] to-[#256653] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center px-3 py-1 rounded-full bg-[#4E9F3D]/20 text-[#6DBF5C] text-xs font-bold mb-3 border border-[#4E9F3D]/40">
-            <UserCheck className="w-3.5 h-3.5 mr-1.5" /> Panel de Dueño de Granja
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            {activeFarm ? safeText(activeFarm.name, 'Mi Granja Agropecuaria') : 'Mi Granja Agropecuaria'}
-          </h1>
-          <p className="text-emerald-100/80 text-sm mt-1 max-w-2xl">
-            {safeText(activeFarm?.code, 'FARM')} • {safeText(activeFarm?.location, 'Ubicación')} — Monitoreo de producción, lotes y delegación de tareas a encargados.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
+      <PageHeader
+        icon={<UserCheck className="w-5 h-5" />}
+        badge="Panel de Dueño de Granja"
+        title={activeFarm ? safeText(activeFarm.name, 'Mi Granja Agropecuaria') : 'Mi Granja Agropecuaria'}
+        subtitle={`${safeText(activeFarm?.code, 'FARM')} • ${safeText(activeFarm?.location, 'Ubicación')} — Monitoreo de producción, lotes y delegación de tareas a encargados.`}
+      >
           <Button
             variant="accent"
-            size="md"
+            size="sm"
             onClick={handleOpenAddSubModal}
             icon={<Plus className="w-4 h-4" />}
           >
             Nuevo Encargado
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Farm Status & Modules Count Header */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -858,7 +850,7 @@ export const AdminDashboard: React.FC = () => {
               <Button type="button" variant="outline" onClick={() => setIsEditSubModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="primary">
+              <Button type="submit" variant="accent">
                 Guardar Cambios
               </Button>
             </div>

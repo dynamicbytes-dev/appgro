@@ -21,7 +21,7 @@ export const NotFoundPage: React.FC = () => {
       </p>
 
       <Button
-        variant="primary"
+        variant="accent"
         onClick={() => navigate('/dashboard')}
         icon={<Home className="w-4 h-4" />}
       >

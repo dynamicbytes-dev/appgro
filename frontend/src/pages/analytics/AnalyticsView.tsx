@@ -4,6 +4,7 @@ import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { useAuth } from '../../context/AuthContext';
 import { farmService } from '../../services/farmService';
 import type { Farm } from '../../types/auth';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { AnalyticsExecutiveTab } from './AnalyticsExecutiveTab';
 import { AnalyticsFinancialTab } from './AnalyticsFinancialTab';
 import { AnalyticsOperationsTab } from './AnalyticsOperationsTab';
@@ -89,20 +90,12 @@ export const AnalyticsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-[#1B4D3E] dark:text-[#6DBF5C]" />
-            <h1 className="text-2xl font-extrabold text-[#1E1E1E] dark:text-gray-100 tracking-tight">
-              Analítica y Reportes
-            </h1>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Indicadores financieros, de producción, ocupación, inventario y personal.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <PageHeader
+        icon={<BarChart3 className="w-5 h-5" />}
+        title="Analítica y Reportes"
+        subtitle="Indicadores financieros, de producción, ocupación, inventario y personal."
+      >
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 justify-end">
           {isRoot && (
             <select
               value={rootFarmFilter}
@@ -177,8 +170,8 @@ export const AnalyticsView: React.FC = () => {
               ]}
             />
           </div>
-        </div>
-      </div>
+          </div>
+      </PageHeader>
 
       {/* Contenido de la pestaña activa */}
       <div className="w-full">{renderTab()}</div>

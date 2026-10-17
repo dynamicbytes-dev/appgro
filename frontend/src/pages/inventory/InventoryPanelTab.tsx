@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
+  Building2,
   CalendarClock,
   CheckCircle2,
   Layers,
@@ -17,6 +18,7 @@ import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { Badge } from '../../components/ui/Badge';
 import { inventoryService } from '../../services/inventoryService';
 import { safeText } from '../../utils/safeText';
+import type { Farm } from '../../types/auth';
 import {
   INVENTORY_ALERT_LABELS,
   type InventoryAlerts,
@@ -24,8 +26,12 @@ import {
 } from '../../types/inventory';
 import { ALERT_BADGE_VARIANT, formatDate, formatMoney, formatQtyWithUnit, toNumber } from './inventoryShared';
 
-interface InventoryPanelTabProps {
+export interface InventoryPanelTabProps {
   isAdmin: boolean;
+  isRoot?: boolean;
+  selectedFarmId?: string;
+  setSelectedFarmId?: (id: string) => void;
+  availableFarms?: Farm[];
 }
 
 type AlertSectionKey = keyof InventoryAlerts;
@@ -67,7 +73,12 @@ const SECTION_META: Record<
   },
 };
 
-export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin }) => {
+export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({
+  isAdmin,
+  isRoot = false,
+  selectedFarmId = 'all',
+  availableFarms = [],
+}) => {
   const { user, activeFarm } = useAuth();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -75,7 +86,15 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const farmId = (activeFarm?.id as number) || (user?.farm_id as number) || undefined;
+  const defaultFarmId = (activeFarm?.id as number) || (user?.farm_id as number) || undefined;
+  const effectiveFarmId = isRoot ? selectedFarmId : defaultFarmId;
+
+  const selectedFarmName = useMemo(() => {
+    if (!isRoot) return activeFarm?.name || 'Granja Principal';
+    if (selectedFarmId === 'all') return 'Consolidado Multigranja (Todas las Sedes)';
+    const found = (availableFarms || []).find((f) => String(f.id) === String(selectedFarmId));
+    return found?.name || `Granja #${selectedFarmId}`;
+  }, [isRoot, selectedFarmId, availableFarms, activeFarm]);
 
   const loadPanel = useCallback(async () => {
     setIsLoading(true);
@@ -83,8 +102,8 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
 
     try {
       const [itemsResult, alertsResult] = await Promise.all([
-        isAdmin ? inventoryService.getAll({ farm_id: farmId }) : inventoryService.getMy(),
-        inventoryService.getAlerts(farmId),
+        isAdmin ? inventoryService.getAll({ farm_id: effectiveFarmId }) : inventoryService.getMy(),
+        inventoryService.getAlerts(effectiveFarmId),
       ]);
 
       setItems(Array.isArray(itemsResult.data) ? itemsResult.data : []);
@@ -96,7 +115,7 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
     } finally {
       setIsLoading(false);
     }
-  }, [isAdmin, farmId]);
+  }, [isAdmin, effectiveFarmId]);
 
   useEffect(() => {
     void loadPanel();
@@ -130,11 +149,12 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
         <ExportKpiPdfButton
           moduleTitle="Módulo de Inventario e Insumos"
           moduleSlug="inventario"
+          farmName={selectedFarmName}
           kpis={[
             {
               title: 'Insumos Totales',
               value: stats.total,
-              subtitle: 'Catálogo registrado',
+              subtitle: isRoot && selectedFarmId === 'all' ? 'Consolidado todas las sedes' : 'Catálogo registrado',
               tone: 'slate',
             },
             {
@@ -158,21 +178,28 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
           ]}
           diagnosis={
             stats.low > 0 || stats.expired > 0
-              ? 'Atención: Existen insumos bajo stock crítico o con fecha de caducidad superada. Se requiere reposición de quiebres e inmovilización de lotes caducados para preservar la bioseguridad agropecuaria.'
-              : 'Salud de inventario óptima: Los niveles de insumos se encuentran dentro de las bandas de reposición y no se registran pérdidas por caducidad.'
+              ? `Atención (${selectedFarmName}): Existen insumos bajo stock crítico o con fecha de caducidad superada. Se requiere reposición de quiebres e inmovilización de lotes caducados para preservar la bioseguridad agropecuaria.`
+              : `Salud de inventario óptima (${selectedFarmName}): Los niveles de insumos se encuentran dentro de las bandas de reposición y no se registran pérdidas por caducidad.`
           }
-          columns={['Insumo', 'Categoría', 'Stock Actual', 'Mínimo', 'Costo Unit.', 'Valor Total', 'Alertas']}
-          rows={(Array.isArray(items) ? items : []).map((item) => [
-            item.name || '-',
-            typeof item.category === 'object' && item.category !== null ? (item.category as any).name || 'General' : (item.category || 'General'),
-            formatQtyWithUnit(item.current_stock, item.unit),
-            formatQtyWithUnit(item.min_stock, item.unit),
-            formatMoney(item.unit_cost),
-            formatMoney(item.total_cost),
-            (item.alert_flags || []).join(', ') || 'Normal',
-          ])}
+          columns={
+            isRoot
+              ? ['Granja', 'Insumo', 'Categoría', 'Stock Actual', 'Mínimo', 'Costo Unit.', 'Valor Total', 'Alertas']
+              : ['Insumo', 'Categoría', 'Stock Actual', 'Mínimo', 'Costo Unit.', 'Valor Total', 'Alertas']
+          }
+          rows={(Array.isArray(items) ? items : []).map((item) => {
+            const baseRow = [
+              item.name || '-',
+              typeof item.category === 'object' && item.category !== null ? (item.category as any).name || 'General' : (item.category || 'General'),
+              formatQtyWithUnit(item.current_stock, item.unit),
+              formatQtyWithUnit(item.min_stock, item.unit),
+              formatMoney(item.unit_cost),
+              formatMoney(item.total_cost),
+              (item.alert_flags || []).join(', ') || 'Normal',
+            ];
+            return isRoot ? [item.farm?.name || item.farm_name || 'Granja', ...baseRow] : baseRow;
+          })}
         />
-        <Button variant="outline" onClick={() => void loadPanel()} icon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="sm" onClick={() => void loadPanel()} icon={<RefreshCw className="w-4 h-4" />}>
           Actualizar
         </Button>
       </div>
@@ -241,7 +268,13 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({ isAdmin })
                       return (
                         <li key={`panel-item-${itemId}`} className="py-2.5 flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {isRoot ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-[#064E3B] dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60 shadow-xs">
+                                  <Building2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                  <span>{item.farm?.name || item.farm_name || 'Granja'}</span>
+                                </span>
+                              ) : null}
                               <span className="font-mono text-[11px] font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
                                 {safeText(item.code, '')}
                               </span>

@@ -4,6 +4,7 @@ import { SYSTEM_MODULES } from '../config/modules';
 import type { ModuleId } from '../types/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { useToast } from '../context/ToastContext';
@@ -227,35 +228,21 @@ export const ModulePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#1B4D3E] to-[#143A2F] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-4">
-          <div className="p-4 rounded-2xl bg-gradient-to-tr from-[#4E9F3D] to-[#6DBF5C] text-white shadow-md border border-white/20">
-            <Icon className="w-8 h-8" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider font-bold text-[#6DBF5C] bg-[#4E9F3D]/20 px-2.5 py-0.5 rounded-full border border-[#4E9F3D]/30">
-                Módulo Agropecuario
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mt-1">
-              {modConfig.name}
-            </h1>
-            <p className="text-xs sm:text-sm text-emerald-100/80 mt-0.5">
-              {modConfig.description}
-            </p>
-          </div>
-        </div>
-
+      <PageHeader
+        icon={<Icon className="w-5 h-5" />}
+        badge="Módulo Agropecuario"
+        title={modConfig.name}
+        subtitle={modConfig.description}
+      >
         <Button
           variant="accent"
-          size="md"
+          size="sm"
           onClick={() => setIsActionModalOpen(true)}
           icon={<Plus className="w-4 h-4" />}
         >
           Nuevo Registro
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Dynamic Module Metrics (Auto-actualizables en tiempo real, sin '...') */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -324,7 +311,7 @@ export const ModulePage: React.FC = () => {
         action={
           <Button
             size="sm"
-            variant="outline"
+            variant="accent"
             icon={<FileText className="w-3.5 h-3.5" />}
             onClick={handleExportPdf}
           >

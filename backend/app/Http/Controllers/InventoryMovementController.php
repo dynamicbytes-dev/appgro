@@ -38,6 +38,7 @@ class InventoryMovementController extends Controller
         }
 
         $query = InventoryMovement::query()->with([
+            'farm:id,name',
             'item:id,code,name,unit',
             'lot:id,code',
             'inventoryLot:id,code,expiration_date',
@@ -45,8 +46,9 @@ class InventoryMovementController extends Controller
         ]);
 
         if ($user->isRoot()) {
-            if ($request->filled('farm_id') && strtolower(trim((string) $request->farm_id)) !== 'all') {
-                $query->where('farm_id', (int) $request->farm_id);
+            $farmId = $request->input('farm_id') ?? $request->input('farmId');
+            if ($farmId !== null && $farmId !== '' && strtolower(trim((string) $farmId)) !== 'all') {
+                $query->where('farm_id', (int) $farmId);
             }
         } else {
             if (! $user->farm_id) {
@@ -55,7 +57,7 @@ class InventoryMovementController extends Controller
                     'message' => 'Usuario sin granja asignada.',
                 ], Response::HTTP_FORBIDDEN);
             }
-            $query->where('farm_id', $user->farm_id)->whereNotNull('farm_id');
+            $query->where('farm_id', (int) $user->farm_id)->whereNotNull('farm_id');
         }
 
         if ($request->filled('type')) {
@@ -271,6 +273,8 @@ class InventoryMovementController extends Controller
      */
     protected function decorateMovement(InventoryMovement $movement): array
     {
+        $farmRelation = $movement->relationLoaded('farm') ? $movement->getRelation('farm') : null;
+
         return array_merge($movement->toArray(), [
             'type_label' => $movement->typeLabel(),
             'stock_effect' => $movement->stockEffect(),
@@ -282,6 +286,8 @@ class InventoryMovementController extends Controller
             'inventory_lot_id' => $movement->inventory_lot_id,
             'inventory_lot_code' => $movement->inventoryLot?->code,
             'inventory_lot_label' => $movement->inventoryLot?->label(),
+            'farm_name' => $farmRelation?->name,
+            'farm' => $farmRelation ? ['id' => $farmRelation->id, 'name' => $farmRelation->name] : null,
             'responsible_name' => $movement->user
                 ? trim(($movement->user->name ?? '').' '.($movement->user->lastname ?? ''))
                 : null,

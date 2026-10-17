@@ -15,6 +15,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { PhoneInput } from '../../components/ui/PhoneInput';
 import { inventoryService } from '../../services/inventoryService';
 import { safeText } from '../../utils/safeText';
 import type { InventorySupplier } from '../../types/inventory';
@@ -227,7 +228,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
             </div>
 
             {isAdmin && (
-              <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
+              <Button variant="accent" size="sm" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
                 Nuevo Proveedor
               </Button>
             )}
@@ -419,8 +420,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                 Teléfono
               </label>
-              <input
-                type="text"
+              <PhoneInput
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="Ej: 0999999999"

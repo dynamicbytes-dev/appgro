@@ -7,6 +7,7 @@ import type { Species, Farm } from '../types/auth';
 import { SpeciesStatsCards } from '../components/species/SpeciesStatsCards';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { StatusBadge, normalizeIsActive } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
@@ -774,22 +775,13 @@ export const SpeciesView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* 1. Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#18221F] p-6 rounded-2xl border border-gray-200 dark:border-[#263632] shadow-sm">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#4E9F3D]/10 text-[#4E9F3D] text-[11px] font-bold mb-1.5 border border-[#4E9F3D]/20">
-            {isRoot ? <ShieldCheck className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
-            <span>{safeText(farmTitle)}</span>
-          </div>
-          <h1 className="text-xl font-black text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
-            <Layers className="w-6 h-6 text-[#1B4D3E] dark:text-[#4E9F3D]" />
-            Gestión de Especies Pecuarias
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Catálogo de especies animales, razas y clasificación por sector pecuario de producción.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<Layers className="w-5 h-5" />}
+        badge={safeText(farmTitle)}
+        badgeIcon={isRoot ? <ShieldCheck className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
+        title="Gestión de Especies Pecuarias"
+        subtitle="Catálogo de especies animales, razas y clasificación por sector pecuario de producción."
+      >
           <Button
             variant="outline"
             size="sm"
@@ -857,8 +849,7 @@ export const SpeciesView: React.FC = () => {
           >
             Nueva Especie
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* 2. Quick Summary Metrics Cards (Componente Único de KPIs) */}
       <SpeciesStatsCards stats={stats} speciesList={speciesList} isLoading={isLoading} />
@@ -1236,7 +1227,7 @@ export const SpeciesView: React.FC = () => {
             </Button>
             <Button
               type="submit"
-              variant="primary"
+              variant="accent"
               size="sm"
               disabled={isSubmitting}
               icon={<CheckCircle2 className="w-4 h-4" />}
@@ -1303,7 +1294,7 @@ export const SpeciesView: React.FC = () => {
             </Button>
             <Button
               type="submit"
-              variant="primary"
+              variant="accent"
               size="sm"
               disabled={isSubmitting}
               icon={<CheckCircle2 className="w-4 h-4" />}
@@ -1382,7 +1373,7 @@ export const SpeciesView: React.FC = () => {
                 Cerrar
               </Button>
               <Button
-                variant="primary"
+                variant="accent"
                 size="sm"
                 onClick={() => {
                   setIsDetailModalOpen(false);

@@ -97,7 +97,7 @@ export const AnalyticsOperationsTab: React.FC<AnalyticsOperationsTabProps> = ({ 
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <Button variant="outline" onClick={() => void load()} icon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="sm" onClick={() => void load()} icon={<RefreshCw className="w-4 h-4" />}>
           Actualizar
         </Button>
       </div>

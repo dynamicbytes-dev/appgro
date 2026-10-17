@@ -234,13 +234,8 @@ class LotController extends Controller
 
         $lots = $query->orderByDesc('created_at')->get();
 
-        // Ocupación actual por lote (activos + gestantes
-        // + destetados): cantidad real de animales que
-        // ocupan espacio en el galpón.
-        Lot::loadCurrentOccupancy($lots);
-
-        // Costo total de cosecha por lote (animales cosechados).
-        Lot::loadHarvestCost($lots);
+        // Producción según propósito, resumen de cosecha, ocupación y costos
+        Lot::loadProductionAndHarvest($lots);
 
         $stats = $this->computeLotStats($request, $user);
 
@@ -572,6 +567,11 @@ class LotController extends Controller
                 'sector' => $sector,
                 'purpose' => $purpose,
                 'quantity' => (int) $request->quantity,
+                'initial_quantity' => (int) $request->quantity,
+                'harvested_quantity' => 0,
+                'initial_weight' => $request->filled('initial_weight') || $request->filled('weight')
+                    ? (float) ($request->input('initial_weight') ?? $request->input('weight'))
+                    : null,
                 'status' => Lot::STATUS_ACTIVE,
                 'entry_date' => $request->filled('entry_date') ? $request->input('entry_date') : now()->toDateString(),
                 'investment_cost' => $request->filled('investment_cost')
@@ -597,6 +597,7 @@ class LotController extends Controller
             'species:id,name,category,is_active',
             'farm:id,name,code',
         ]);
+        Lot::loadProductionAndHarvest(collect([$lot]));
 
         return response()->json([
             'status' => 'success',
@@ -619,7 +620,7 @@ class LotController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $lot->setAttribute('current_occupancy', $lot->currentOccupancy());
+        Lot::loadProductionAndHarvest(collect([$lot]));
 
         return response()->json([
             'status' => 'success',
@@ -906,6 +907,8 @@ class LotController extends Controller
 
         $remaining = (int) $lot->quantity - $harvestQuantity;
 
+        $lot->harvested_quantity = ((int) ($lot->harvested_quantity ?? 0)) + $harvestQuantity;
+
         if ($remaining <= 0) {
             // Full harvest: release the whole capacity and deactivate the lot (logical delete)
             $lot->quantity = 0;
@@ -923,6 +926,7 @@ class LotController extends Controller
             'species:id,name,category,is_active',
             'farm:id,name,code',
         ]);
+        Lot::loadProductionAndHarvest(collect([$lot]));
 
         return response()->json([
             'status' => 'success',

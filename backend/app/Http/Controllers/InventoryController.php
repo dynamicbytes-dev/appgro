@@ -46,7 +46,7 @@ class InventoryController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $query = InventoryItem::query()->with(['creator:id,name,lastname', 'supplier:id,name', 'warehouse:id,name']);
+        $query = InventoryItem::query()->with(['creator:id,name,lastname', 'supplier:id,name', 'warehouse:id,name', 'farm:id,name']);
 
         if (! $this->applyFarmScope($request, $user, $query)) {
             return response()->json([
@@ -85,7 +85,7 @@ class InventoryController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        $query = InventoryItem::query()->with(['supplier:id,name', 'warehouse:id,name']);
+        $query = InventoryItem::query()->with(['supplier:id,name', 'warehouse:id,name', 'farm:id,name']);
 
         if (! $this->applyFarmScope($request, $user, $query)) {
             return response()->json([
@@ -211,7 +211,7 @@ class InventoryController extends Controller
     {
         $user = Auth::guard('api')->user() ?? Auth::user();
 
-        $item = InventoryItem::with(['creator:id,name,lastname', 'supplier:id,name', 'warehouse:id,name'])->find($id);
+        $item = InventoryItem::with(['creator:id,name,lastname', 'supplier:id,name', 'warehouse:id,name', 'farm:id,name'])->find($id);
 
         if (! $item || ! $this->canView($user, $item)) {
             return response()->json([
@@ -378,7 +378,7 @@ class InventoryController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        $base = InventoryItem::query()->with(['supplier:id,name', 'warehouse:id,name']);
+        $base = InventoryItem::query()->with(['supplier:id,name', 'warehouse:id,name', 'farm:id,name']);
 
         if (! $this->applyFarmScope($request, $user, $base)) {
             return response()->json([
@@ -475,8 +475,9 @@ class InventoryController extends Controller
     protected function applyFarmScope(Request $request, $user, $query): bool
     {
         if ($user->isRoot()) {
-            if ($request->filled('farm_id') && strtolower(trim((string) $request->farm_id)) !== 'all') {
-                $query->where('farm_id', (int) $request->farm_id);
+            $farmId = $request->input('farm_id') ?? $request->input('farmId');
+            if ($farmId !== null && $farmId !== '' && strtolower(trim((string) $farmId)) !== 'all') {
+                $query->where('farm_id', (int) $farmId);
             }
 
             return true;
@@ -550,8 +551,9 @@ class InventoryController extends Controller
         $base = InventoryItem::query();
 
         if ($user->isRoot()) {
-            if ($request->filled('farm_id') && strtolower(trim((string) $request->farm_id)) !== 'all') {
-                $base->where('farm_id', (int) $request->farm_id);
+            $farmId = $request->input('farm_id') ?? $request->input('farmId');
+            if ($farmId !== null && $farmId !== '' && strtolower(trim((string) $farmId)) !== 'all') {
+                $base->where('farm_id', (int) $farmId);
             }
         } else {
             if (! $user->farm_id) {
@@ -599,9 +601,11 @@ class InventoryController extends Controller
         // colisiona con el nombre de la relación homónima.
         $supplierRelation = $item->relationLoaded('supplier') ? $item->getRelation('supplier') : null;
         $warehouseRelation = $item->relationLoaded('warehouse') ? $item->getRelation('warehouse') : null;
+        $farmRelation = $item->relationLoaded('farm') ? $item->getRelation('farm') : null;
 
         $supplierName = $supplierRelation?->name ?? $item->getRawOriginal('supplier');
         $warehouseName = $warehouseRelation?->name ?? $item->getRawOriginal('location');
+        $farmName = $farmRelation?->name ?? null;
 
         return array_merge($item->toArray(), [
             'category_label' => $item->categoryLabel(),
@@ -618,6 +622,8 @@ class InventoryController extends Controller
             'location' => $warehouseName,
             'supplier_name' => $supplierName,
             'warehouse_name' => $warehouseName,
+            'farm_name' => $farmName,
+            'farm' => $farmRelation ? ['id' => $farmRelation->id, 'name' => $farmRelation->name] : null,
             'supplier_id' => $item->supplier_id,
             'warehouse_id' => $item->warehouse_id,
         ]);

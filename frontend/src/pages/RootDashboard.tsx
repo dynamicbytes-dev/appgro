@@ -6,6 +6,7 @@ import { adminService } from '../services/adminService';
 import type { Farm, User } from '../types/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
 import { StatusBadge } from '../components/ui/StatusBadge';
@@ -170,20 +171,12 @@ export const RootDashboard: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-[#1B4D3E] via-[#143A2F] to-[#0B2019] text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden border border-emerald-900/30">
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-xs text-emerald-200 font-semibold mb-3">
-            <ShieldCheck className="w-4 h-4 text-[#6DBF5C]" />
-            Consola Global de Super Administrador (Root)
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            Bienvenido, {safeText(user?.name, 'Administrador Root')}
-          </h1>
-          <p className="text-xs sm:text-sm text-emerald-200/90 mt-1 max-w-2xl">
-            Control global de infraestructura agropecuaria multi-granja. Gestiona empresas, dueños y permisos desde PostgreSQL.
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={<ShieldCheck className="w-5 h-5" />}
+        badge="Consola Global de Super Administrador (Root)"
+        title={`Bienvenido, ${safeText(user?.name, 'Administrador Root')}`}
+        subtitle="Control global de infraestructura agropecuaria multi-granja. Gestiona empresas, dueños y permisos desde PostgreSQL."
+      />
 
       {/* Messages */}
       {successMessage && (

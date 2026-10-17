@@ -44,18 +44,19 @@ abstract class InventoryCatalogController extends Controller
         }
 
         $model = $this->modelClass();
-        $query = $model::query()->withCount('items');
+        $query = $model::query()->with('farm:id,name')->withCount('items');
 
         if ($user->isRoot()) {
-            if ($request->filled('farm_id') && strtolower(trim((string) $request->farm_id)) !== 'all') {
-                $query->where('farm_id', (int) $request->farm_id);
+            $farmId = $request->input('farm_id') ?? $request->input('farmId');
+            if ($farmId !== null && $farmId !== '' && strtolower(trim((string) $farmId)) !== 'all') {
+                $query->where('farm_id', (int) $farmId);
             }
         } else {
             if (! $user->farm_id) {
                 return $this->error('Usuario sin granja asignada.', Response::HTTP_FORBIDDEN);
             }
 
-            $query->where('farm_id', (int) $user->farm_id);
+            $query->where('farm_id', (int) $user->farm_id)->whereNotNull('farm_id');
         }
 
         if ($request->filled('search')) {
@@ -246,7 +247,12 @@ abstract class InventoryCatalogController extends Controller
 
     protected function decorate($record): array
     {
-        return $record->toArray();
+        $farmRelation = $record->relationLoaded('farm') ? $record->getRelation('farm') : null;
+
+        return array_merge($record->toArray(), [
+            'farm_name' => $farmRelation?->name,
+            'farm' => $farmRelation ? ['id' => $farmRelation->id, 'name' => $farmRelation->name] : null,
+        ]);
     }
 
     protected function error(string $message, int $status)

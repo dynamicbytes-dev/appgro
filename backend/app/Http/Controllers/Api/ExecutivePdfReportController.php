@@ -97,7 +97,8 @@ class ExecutivePdfReportController extends Controller
         ];
 
         // Cálculo de KPIs y Diagnóstico según el módulo
-        [$kpis, $diagnosis] = match ($canonicalModule) {
+        $extraData = [];
+        $result = match ($canonicalModule) {
             'especies' => $this->buildSpeciesKpis($targetFarmId),
             'galpones' => $this->buildGalponesKpis($targetFarmId),
             'lotes' => $this->buildLotesKpis($targetFarmId),
@@ -106,14 +107,20 @@ class ExecutivePdfReportController extends Controller
             'analitica' => $this->buildAnaliticaKpis($targetFarmId),
         };
 
-        $responseData = [
+        $kpis = $result[0];
+        $diagnosis = $result[1];
+        if (isset($result[2]) && is_array($result[2])) {
+            $extraData = $result[2];
+        }
+
+        $responseData = array_merge([
             'module' => $canonicalModule,
             'audit' => $audit,
             'kpis' => $kpis,
             'diagnosis' => $diagnosis,
-        ];
+        ], $extraData);
 
-        return response()->json([
+        return response()->json(array_merge([
             'status' => 'success',
             'message' => 'Reporte ejecutivo de KPIs obtenido exitosamente.',
             'module' => $canonicalModule,
@@ -121,7 +128,7 @@ class ExecutivePdfReportController extends Controller
             'kpis' => $kpis,
             'diagnosis' => $diagnosis,
             'data' => $responseData,
-        ], Response::HTTP_OK);
+        ], $extraData), Response::HTTP_OK);
     }
 
     /**
@@ -316,16 +323,21 @@ class ExecutivePdfReportController extends Controller
      */
     protected function buildLotesKpis(?int $farmId): array
     {
-        $lotQuery = Lot::query();
+        $lotQuery = Lot::query()->with([
+            'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
+            'species:id,name,category,is_active',
+            'farm:id,name,code',
+        ]);
         $this->applyFarmScope($lotQuery, $farmId);
 
-        $allLots = $lotQuery->get();
+        $allLots = $lotQuery->orderByDesc('created_at')->get();
+        Lot::loadProductionAndHarvest($allLots);
+
         $activeLotsCount = $allLots->where('status', Lot::STATUS_ACTIVE)->count();
         $closedLotsCount = $allLots->where('status', '!=', Lot::STATUS_ACTIVE)->count();
 
         // Población viva: lotes activos con ocupación dinámica
         $activeLots = $allLots->where('status', Lot::STATUS_ACTIVE);
-        Lot::loadCurrentOccupancy($activeLots);
         $livePopulation = (int) $activeLots->sum(fn ($l) => (int) ($l->current_occupancy ?? $l->quantity));
 
         // Producción de huevos
@@ -335,7 +347,6 @@ class ExecutivePdfReportController extends Controller
         $mermaPercent = $totalEggs > 0 ? round(($brokenEggs / $totalEggs) * 100, 1) : 0.0;
 
         // Costo Total de Cosecha: incluye ventas de animales y costo de postura calculado únicamente sobre huevos buenos
-        Lot::loadHarvestCost($allLots);
         $totalHarvestCost = round((float) $allLots->sum('harvest_cost'), 2);
 
         $eggStatus = $mermaPercent > 5 ? 'warning' : 'success';
@@ -373,7 +384,76 @@ class ExecutivePdfReportController extends Controller
 
         $diagnosis = "El plantel productivo mantiene {$activeLotsCount} lotes activos con una población viva de ".number_format($livePopulation)." animales y {$closedLotsCount} ciclos cerrados. Acumula ".number_format($totalEggs)." huevos producidos (".number_format($goodEggs)." comerciales). {$mermaNote} La valorización acumulada de cosecha se sitúa en $ ".number_format($totalHarvestCost, 2).'.';
 
-        return [$kpis, $diagnosis];
+        // 1. Resumen consolidado de producción por propósito
+        $eggLots = $allLots->filter(fn ($l) => $l->isEggPurpose());
+        $reproLots = $allLots->filter(fn ($l) => $l->isReproductionPurpose() || Species::normalizeKey($l->purpose) === 'cria');
+        $meatLots = $allLots->filter(fn ($l) => ! $l->isEggPurpose() && ! $l->isReproductionPurpose());
+
+        $reproFarrowings = (int) $reproLots->sum(fn ($l) => $l->purpose_production['farrowings_count'] ?? 0);
+        $reproBornAlive = (int) $reproLots->sum(fn ($l) => $l->purpose_production['born_alive'] ?? 0);
+        $reproBornDead = (int) $reproLots->sum(fn ($l) => $l->purpose_production['born_dead'] ?? 0);
+        $reproWeaned = (int) $reproLots->sum(fn ($l) => $l->purpose_production['weaned_count'] ?? 0);
+
+        $meatWeightGain = (float) $meatLots->sum(fn ($l) => $l->purpose_production['total_weight_gain'] ?? 0);
+        $meatTotalWeight = (float) $meatLots->sum(fn ($l) => $l->purpose_production['total_current_weight'] ?? 0);
+
+        $purposeProductionSummary = [
+            'postura' => [
+                'total_eggs' => $totalEggs,
+                'good_eggs' => $goodEggs,
+                'broken_eggs' => $brokenEggs,
+                'merma_percentage' => $mermaPercent,
+                'production_cost' => round((float) $eggLots->sum('total_egg_cost'), 2),
+            ],
+            'reproduccion' => [
+                'farrowings_count' => $reproFarrowings,
+                'born_alive' => $reproBornAlive,
+                'born_dead' => $reproBornDead,
+                'weaned_count' => $reproWeaned,
+            ],
+            'engorde' => [
+                'total_weight_gain' => round($meatWeightGain, 2),
+                'total_current_weight' => round($meatTotalWeight, 2),
+            ],
+        ];
+
+        // 2. Resumen consolidado de cosecha
+        $totalHarvestedQuantity = (int) $allLots->sum(fn ($l) => $l->harvest_summary['harvested_quantity'] ?? 0);
+        $totalHarvestedWeight = (float) $allLots->sum(fn ($l) => $l->harvest_summary['harvested_weight'] ?? 0);
+        $totalDirectHarvestCost = (float) $allLots->sum(fn ($l) => $l->harvest_summary['harvest_cost'] ?? 0);
+        $totalAccumulatedHarvestCost = (float) $allLots->sum(fn ($l) => $l->harvest_summary['total_harvest_cost'] ?? 0);
+
+        $harvestSummary = [
+            'harvested_quantity' => $totalHarvestedQuantity,
+            'harvested_weight' => round($totalHarvestedWeight, 2),
+            'avg_harvest_weight' => $totalHarvestedQuantity > 0 ? round($totalHarvestedWeight / $totalHarvestedQuantity, 2) : 0.0,
+            'harvest_cost' => round($totalDirectHarvestCost, 2),
+            'total_harvest_cost' => round($totalAccumulatedHarvestCost, 2),
+            'closed_lots_count' => $closedLotsCount,
+            'active_lots_count' => $activeLotsCount,
+        ];
+
+        // 3. Mapeo detallado de cada lote para la tabla del reporte PDF
+        $lotsPayload = $allLots->map(function ($l) {
+            return [
+                'id' => $l->id,
+                'code' => $l->code,
+                'species' => $l->species?->name ?? 'N/A',
+                'galpon' => $l->galpon?->name ?? 'N/A',
+                'purpose' => $l->purpose,
+                'status' => $l->status,
+                'quantity' => (int) $l->quantity,
+                'current_occupancy' => (int) ($l->current_occupancy ?? $l->quantity),
+                'purpose_production' => $l->purpose_production,
+                'harvest_summary' => $l->harvest_summary,
+            ];
+        })->values()->all();
+
+        return [$kpis, $diagnosis, [
+            'lots' => $lotsPayload,
+            'purpose_production' => $purposeProductionSummary,
+            'harvest_summary' => $harvestSummary,
+        ]];
     }
 
     /**
@@ -436,7 +516,20 @@ class ExecutivePdfReportController extends Controller
             $diagnosis = "Cadena de suministros estable: los {$totalItems} insumos catalogados se encuentran por encima de sus límites de seguridad mínimos, con trazabilidad garantizada en {$totalLots} lotes de entrada y una valoración de existencias de $ ".number_format($totalStockValue, 2).'.';
         }
 
-        return [$kpis, $diagnosis];
+        $items = (clone $itemQuery)->with(['farm:id,name', 'supplier:id,name', 'warehouse:id,name'])
+            ->orderBy('name')
+            ->limit(500)
+            ->get();
+
+        return [$kpis, $diagnosis, [
+            'items' => $items,
+            'inventory' => [
+                'total_items' => $totalItems,
+                'total_lots' => $totalLots,
+                'total_stock_value' => $totalStockValue,
+                'critical_items' => $criticalItems,
+            ],
+        ]];
     }
 
     /**

@@ -235,21 +235,23 @@ export async function generateExecutiveKpiPdf(options: ExecutiveKpiPdfOptions): 
 
     // Título del KPI
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7);
+    doc.setFontSize(6.8);
     doc.setTextColor(100, 116, 139); // #64748B
     const truncatedTitle = doc.splitTextToSize(kpi.title.toUpperCase(), cardWidth - 5);
     doc.text(truncatedTitle[0] || '', cardX + 4.5, currentY + 5);
 
-    // Valor principal
+    // Valor principal con auto-ajuste de escala según longitud
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    const valStr = String(kpi.value);
+    const valFontSize = valStr.length > 20 ? 8.5 : valStr.length > 15 ? 10 : valStr.length > 12 ? 11.5 : 13;
+    doc.setFontSize(valFontSize);
     doc.setTextColor(...cardTone.valueText);
-    doc.text(String(kpi.value), cardX + 4.5, currentY + 12.5);
+    doc.text(valStr, cardX + 4.5, currentY + 12.5);
 
     // Subtítulo descriptivo
     if (kpi.subtitle) {
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
+      doc.setFontSize(6.2);
       doc.setTextColor(148, 163, 184); // #94A3B8
       const truncSub = doc.splitTextToSize(kpi.subtitle, cardWidth - 5);
       doc.text(truncSub[0] || '', cardX + 4.5, currentY + 18);
@@ -278,17 +280,17 @@ export async function generateExecutiveKpiPdf(options: ExecutiveKpiPdfOptions): 
       fillColor: [6, 78, 59], // #064E3B
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 8,
+      fontSize: 7.2,
       halign: 'left',
-      cellPadding: 2.5,
+      cellPadding: 2,
     },
     alternateRowStyles: {
       fillColor: [249, 250, 251], // #F9FAFB
     },
     bodyStyles: {
-      fontSize: 7.5,
+      fontSize: 6.8,
       textColor: [31, 41, 55], // #1F2937
-      cellPadding: 2.2,
+      cellPadding: 1.8,
       lineColor: [229, 231, 235], // #E5E7EB
       lineWidth: 0.15,
     },

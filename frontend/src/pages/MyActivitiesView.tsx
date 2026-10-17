@@ -13,6 +13,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { activityService } from '../services/activityService';
@@ -138,23 +139,15 @@ export const MyActivitiesView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-[#1B4D3E] dark:text-[#6DBF5C]" />
-            <h1 className="text-2xl font-extrabold text-[#1E1E1E] dark:text-gray-100 tracking-tight">
-              Mis Actividades
-            </h1>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Tareas asignadas por el administrador. {stats ? `${stats.total} en total.` : ''}
-          </p>
-        </div>
-
-        <Button variant="outline" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
+      <PageHeader
+        icon={<ClipboardList className="w-5 h-5" />}
+        title="Mis Actividades"
+        subtitle={`Tareas asignadas por el administrador. ${stats ? `${stats.total} en total.` : ''}`}
+      >
+        <Button variant="outline" size="sm" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
           Actualizar
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Resumen */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDownCircle, ArrowUpCircle, Loader2, Plus, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Building2, Loader2, Plus, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
+import { NumberInput } from '../../components/ui/NumberInput';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
@@ -357,13 +358,24 @@ export const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({
               <option key="default-item-opt" value="">
                 Seleccionar insumo...
               </option>
-              {(items || []).map((item) => (
-                <option key={`mov-modal-item-${item.id}`} value={item.id}>
-                  {safeText(item.code, '')} · {safeText(item.name, `Insumo #${item.id}`)} (stock:{' '}
-                  {formatQtyWithUnit(item.current_stock, item.unit)})
-                </option>
-              ))}
+              {(items || []).map((item) => {
+                const farmTag = item.farm?.name || item.farm_name ? ` [${item.farm?.name || item.farm_name}]` : '';
+                return (
+                  <option key={`mov-modal-item-${item.id}`} value={item.id}>
+                    {safeText(item.code, '')} · {safeText(item.name, `Insumo #${item.id}`)}{farmTag} (stock:{' '}
+                    {formatQtyWithUnit(item.current_stock, item.unit)})
+                  </option>
+                );
+              })}
             </select>
+            {selectedItem && (selectedItem.farm?.name || selectedItem.farm_name) ? (
+              <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-800 dark:text-emerald-300 font-medium">
+                <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>
+                  Granja: <strong className="font-bold">{selectedItem.farm?.name || selectedItem.farm_name}</strong>
+                </span>
+              </div>
+            ) : null}
             {errors.inventory_item_id ? (
               <p key="err-inventory-item-id" className="text-xs text-red-600 mt-1">
                 {errors.inventory_item_id}
@@ -380,9 +392,9 @@ export const InventoryMovementModal: React.FC<InventoryMovementModalProps> = ({
                 <span>{selectedItem ? ` (${unitShortOf(selectedItem.unit)})` : ''}</span>
                 <span> *</span>
               </label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.01"
+                allowNegative={type === 'ajuste'}
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder={type === 'ajuste' ? 'Ej: -5 o 3' : 'Ej: 25'}

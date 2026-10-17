@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
-  CalendarClock,
+  Building2,
   Edit2,
   Eye,
+  Layers,
   Loader2,
   Package,
   PackagePlus,
@@ -20,8 +21,10 @@ import { Button } from '../../components/ui/Button';
 import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { NumberInput } from '../../components/ui/NumberInput';
 import { inventoryService } from '../../services/inventoryService';
 import { safeText } from '../../utils/safeText';
+import type { Farm } from '../../types/auth';
 import {
   INVENTORY_ALERT_LABELS,
   INVENTORY_CATEGORIES,
@@ -47,8 +50,12 @@ import {
 } from './inventoryShared';
 import { InventoryMovementModal } from './InventoryMovementModal';
 
-interface InventoryItemsTabProps {
+export interface InventoryItemsTabProps {
   isAdmin: boolean;
+  isRoot?: boolean;
+  selectedFarmId?: string;
+  setSelectedFarmId?: (id: string) => void;
+  availableFarms?: Farm[];
 }
 
 interface ItemForm {
@@ -92,7 +99,13 @@ const ALERT_FLAG_BY_FILTER: Record<Exclude<AlertFilter, ''>, InventoryAlertFlag>
   expired: 'vencido',
 };
 
-export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin }) => {
+export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({
+  isAdmin,
+  isRoot = false,
+  selectedFarmId = 'all',
+  setSelectedFarmId,
+  availableFarms = [],
+}) => {
   const { user, activeFarm } = useAuth();
   const { toastSuccess, toastError } = useToast();
 
@@ -118,7 +131,16 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
   const [supplierOptions, setSupplierOptions] = useState<InventorySupplier[]>([]);
   const [warehouseOptions, setWarehouseOptions] = useState<InventoryWarehouse[]>([]);
 
-  const farmId = (activeFarm?.id as number) || (user?.farm_id as number) || undefined;
+  const defaultFarmId = (activeFarm?.id as number) || (user?.farm_id as number) || undefined;
+  const effectiveFarmId = isRoot ? selectedFarmId : defaultFarmId;
+  const showFarmColumn = Boolean(isRoot);
+
+  const selectedFarmName = useMemo(() => {
+    if (!isRoot) return activeFarm?.name || 'Granja Principal';
+    if (selectedFarmId === 'all') return 'Consolidado Multigranja (Todas las Sedes)';
+    const found = (availableFarms || []).find((f) => String(f.id) === String(selectedFarmId));
+    return found?.name || `Granja #${selectedFarmId}`;
+  }, [isRoot, selectedFarmId, availableFarms, activeFarm]);
 
   const loadItems = useCallback(async () => {
     setIsLoading(true);
@@ -126,7 +148,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
 
     try {
       const result = isAdmin
-        ? await inventoryService.getAll({ farm_id: farmId })
+        ? await inventoryService.getAll({ farm_id: effectiveFarmId })
         : await inventoryService.getMy();
 
       setItems(Array.isArray(result.data) ? result.data : []);
@@ -137,7 +159,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
     } finally {
       setIsLoading(false);
     }
-  }, [isAdmin, farmId]);
+  }, [isAdmin, effectiveFarmId]);
 
   useEffect(() => {
     void loadItems();
@@ -149,9 +171,10 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
 
     (async () => {
       try {
+        const queryFarmId = effectiveFarmId !== 'all' ? effectiveFarmId : undefined;
         const [suppliers, warehouses] = await Promise.all([
-          inventoryService.getSuppliers({ farm_id: farmId }),
-          inventoryService.getWarehouses({ farm_id: farmId }),
+          inventoryService.getSuppliers({ farm_id: queryFarmId }),
+          inventoryService.getWarehouses({ farm_id: queryFarmId }),
         ]);
 
         if (!cancelled) {
@@ -166,7 +189,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
     return () => {
       cancelled = true;
     };
-  }, [farmId]);
+  }, [effectiveFarmId]);
 
   const filteredItems = useMemo(() => {
     const list = Array.isArray(items) ? items : [];
@@ -276,7 +299,11 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
         await inventoryService.create({
           ...basePayload,
           current_stock: form.current_stock === '' ? 0 : toNumber(form.current_stock),
-          farm_id: isAdmin ? farmId : undefined,
+          farm_id: isAdmin
+            ? isRoot && selectedFarmId !== 'all'
+              ? Number(selectedFarmId)
+              : defaultFarmId
+            : undefined,
         });
         toastSuccess('Insumo registrado', 'El insumo se agregó al inventario con su código único.');
       }
@@ -317,15 +344,45 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
   };
 
   const summaryCards = [
-    { id: 'total-items', label: 'Insumos', value: stats?.total_items ?? (items || []).length, icon: Package, color: 'text-[#1B4D3E] dark:text-[#6DBF5C]', bg: 'bg-[#1B4D3E]/10' },
-    { id: 'total-value', label: 'Valor total', value: formatMoney(stats?.total_value ?? 0), icon: PackagePlus, color: 'text-[#4E9F3D]', bg: 'bg-[#4E9F3D]/10' },
-    { id: 'low-stock', label: 'Bajo mínimo', value: stats?.low_stock ?? 0, icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/10' },
-    { id: 'expiring-soon', label: 'Por vencer', value: stats?.expiring ?? 0, icon: CalendarClock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+    {
+      id: 'total-items',
+      label: 'Total Insumos',
+      value: stats?.total_items ?? (items || []).length,
+      icon: Package,
+      color: 'text-[#1B4D3E] dark:text-[#6DBF5C]',
+      bg: 'bg-[#1B4D3E]/10',
+    },
+    {
+      id: 'total-value',
+      label: 'Valoración Total',
+      value: formatMoney(
+        stats?.total_value ?? (items || []).reduce((s, i) => s + toNumber(i?.total_cost), 0)
+      ),
+      icon: PackagePlus,
+      color: 'text-[#4E9F3D]',
+      bg: 'bg-[#4E9F3D]/10',
+    },
+    {
+      id: 'low-stock',
+      label: 'Stock Crítico',
+      value: `${stats?.low_stock ?? 0} bajo mín.`,
+      icon: AlertTriangle,
+      color: (stats?.low_stock ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400',
+      bg: (stats?.low_stock ?? 0) > 0 ? 'bg-red-500/10' : 'bg-emerald-500/10',
+    },
+    {
+      id: 'batches-movements',
+      label: 'Lotes / Movimientos',
+      value: `${(items || []).filter((i) => Boolean(i?.batch_number)).length} lotes`,
+      icon: Layers,
+      color: 'text-[#1B4D3E] dark:text-[#6DBF5C]',
+      bg: 'bg-[#1B4D3E]/10',
+    },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Resumen */}
+      {/* Resumen de KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {(summaryCards || []).map((card) => (
           <Card key={card.id} className="p-4!">
@@ -346,7 +403,44 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
 
       {/* Barra de acciones + filtros */}
       <Card>
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
+          {/* Selector de Granja exclusivo para usuario root */}
+          {isRoot && (
+            <div className="p-3.5 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-950/40 dark:via-emerald-950/20 dark:to-transparent border border-emerald-500/30 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-xs border border-emerald-500/30">
+                  <Building2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <label htmlFor="root-inventory-farm-select" className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
+                    <span>Granja a consultar</span>
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-600 text-white">ROOT</span>
+                  </label>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    {selectedFarmId === 'all'
+                      ? 'Consolidado global: visualizando existencias y movimientos de todas las granjas'
+                      : `Filtrando exclusivamente existencias de: ${selectedFarmName}`}
+                  </p>
+                </div>
+              </div>
+              <div className="md:w-80">
+                <select
+                  id="root-inventory-farm-select"
+                  value={selectedFarmId}
+                  onChange={(e) => setSelectedFarmId?.(e.target.value)}
+                  className="w-full px-3.5 py-2 text-sm font-semibold rounded-lg border border-emerald-500/40 bg-white dark:bg-[#18221F] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-sm"
+                >
+                  <option value="all">Todas las granjas (Vista Global)</option>
+                  {(availableFarms || []).map((farm) => (
+                    <option key={`root-opt-farm-${farm.id}`} value={String(farm.id)}>
+                      {farm.name} {farm.code ? `(${farm.code})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <Button
@@ -358,7 +452,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 Actualizar
               </Button>
               <Button
-                variant="primary"
+                variant="accent"
                 size="sm"
                 onClick={() => setIsMovementModalOpen(true)}
                 icon={<Plus className="w-3.5 h-3.5" />}
@@ -371,11 +465,12 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
               <ExportKpiPdfButton
                 moduleTitle="Módulo de Inventario de Insumos"
                 moduleSlug="inventario"
+                farmName={selectedFarmName}
                 kpis={[
                   {
                     title: 'Total Insumos',
                     value: stats?.total_items ?? (items || []).length,
-                    subtitle: 'Registros en catálogo',
+                    subtitle: isRoot && selectedFarmId === 'all' ? 'Consolidado todas las sedes' : 'Registros en catálogo',
                     tone: 'slate',
                   },
                   {
@@ -387,13 +482,13 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                     tone: 'emerald',
                   },
                   {
-                    title: 'Alertas de Stock',
+                    title: 'Stock Crítico',
                     value: `${stats?.low_stock ?? 0} bajo mín. / ${stats?.expiring ?? 0} por vencer`,
                     subtitle: (stats?.low_stock ?? 0) > 0 ? 'Quiebre de stock crítico' : 'Stock en rango seguro',
                     tone: (stats?.low_stock ?? 0) > 0 ? 'red' : (stats?.expiring ?? 0) > 0 ? 'amber' : 'emerald',
                   },
                   {
-                    title: 'Lotes Activos',
+                    title: 'Lotes / Movimientos',
                     value: `${(items || []).filter((i) => Boolean(i?.batch_number)).length} lotes`,
                     subtitle: 'Insumos con lote trazable',
                     tone: 'slate',
@@ -401,10 +496,14 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 ]}
                 diagnosis={
                   (stats?.low_stock ?? 0) > 0 || (stats?.expiring ?? 0) > 0
-                    ? `Atención de inventario: Se detectan ${stats?.low_stock ?? 0} insumos bajo stock mínimo y ${stats?.expiring ?? 0} próximos a vencer. Se recomienda tramitar órdenes de compra e inspeccionar lotes para resguardar la continuidad operativa y bioseguridad agropecuaria.`
-                    : 'Salud de inventario óptima: Los niveles de insumos se encuentran dentro de los márgenes de seguridad y rotación zootécnica sin alertas críticas de desabastecimiento.'
+                    ? `Atención de inventario (${selectedFarmName}): Se detectan ${stats?.low_stock ?? 0} insumos bajo stock mínimo y ${stats?.expiring ?? 0} próximos a vencer. Se recomienda tramitar órdenes de compra e inspeccionar lotes para resguardar la continuidad operativa y bioseguridad agropecuaria.`
+                    : `Salud de inventario óptima (${selectedFarmName}): Los niveles de insumos se encuentran dentro de los márgenes de seguridad y rotación zootécnica sin alertas críticas de desabastecimiento.`
                 }
-                columns={['Código', 'Insumo', 'Categoría', 'Stock Actual', 'Stock Mín.', 'Lote / Vence', 'Costo Unit.', 'Valor Total', 'Alertas']}
+                columns={
+                  showFarmColumn
+                    ? ['Granja', 'Código', 'Insumo', 'Categoría', 'Stock Actual', 'Stock Mín.', 'Lote / Vence', 'Costo Unit.', 'Valor Total', 'Alertas']
+                    : ['Código', 'Insumo', 'Categoría', 'Stock Actual', 'Stock Mín.', 'Lote / Vence', 'Costo Unit.', 'Valor Total', 'Alertas']
+                }
                 rows={(filteredItems || []).map((item) => {
                   const alerts = Array.isArray(item?.alert_flags) ? item.alert_flags : [];
                   const alertText = alerts.map((f) => INVENTORY_ALERT_LABELS[f] ?? f).join(', ') || 'Normal';
@@ -413,7 +512,9 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                     item?.category || 'General'
                   );
                   const batchExp = `${safeText(item?.batch_number ?? '', '—')} / ${formatDate(item?.expiration_date)}`;
-                  return [
+                  const farmColVal = item?.farm?.name || item?.farm_name || 'Sede Principal';
+
+                  const baseRow = [
                     safeText(item?.code, `INS-${item?.id}`),
                     safeText(item?.name, `Insumo #${item?.id}`),
                     categoryText,
@@ -424,11 +525,13 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                     formatMoney(item?.total_cost),
                     alertText,
                   ];
+
+                  return showFarmColumn ? [farmColVal, ...baseRow] : baseRow;
                 })}
               />
 
               {isAdmin ? (
-                <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
+                <Button variant="accent" size="sm" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
                   Nuevo Insumo
                 </Button>
               ) : null}
@@ -498,6 +601,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-50 dark:bg-[#263632] text-[11px] uppercase tracking-wider text-gray-500 dark:text-gray-300">
+                  {showFarmColumn ? <th className="px-4 py-3 font-bold">Granja</th> : null}
                   <th className="px-4 py-3 font-bold">Insumo</th>
                   <th className="px-4 py-3 font-bold">Categoría</th>
                   <th className="px-4 py-3 font-bold">Stock</th>
@@ -513,6 +617,16 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
 
                   return (
                     <tr key={itemId} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
+                      {showFarmColumn ? (
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-[#064E3B] dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800/60 shadow-xs">
+                            <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="truncate max-w-[140px]" title={item.farm?.name || item.farm_name || 'Granja'}>
+                              {item.farm?.name || item.farm_name || 'Granja'}
+                            </span>
+                          </span>
+                        </td>
+                      ) : null}
                       <td className="px-4 py-3 max-w-[240px]">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono text-xs font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
@@ -635,7 +749,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
         maxWidth="lg"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                 Nombre *
@@ -687,13 +801,12 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                 Stock mínimo ({unitShortOf(form.unit)}) *
               </label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.01"
                 value={form.min_stock}
                 onChange={(e) => setForm({ ...form, min_stock: e.target.value })}
@@ -707,8 +820,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                 Stock máximo ({unitShortOf(form.unit)})
               </label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.01"
                 value={form.max_stock}
                 onChange={(e) => setForm({ ...form, max_stock: e.target.value })}
@@ -723,8 +835,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
                 <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                   Stock inicial ({unitShortOf(form.unit)})
                 </label>
-                <input
-                  type="number"
+                <NumberInput
                   step="0.01"
                   value={form.current_stock}
                   onChange={(e) => setForm({ ...form, current_stock: e.target.value })}
@@ -796,13 +907,12 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
                 Costo unitario *
               </label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.01"
                 value={form.unit_cost}
                 onChange={(e) => setForm({ ...form, unit_cost: e.target.value })}
@@ -884,6 +994,12 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({ isAdmin })
             ) : null}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {showFarmColumn || selectedItem.farm?.name || selectedItem.farm_name ? (
+                <Field
+                  label="Granja / Sede"
+                  value={selectedItem.farm?.name || selectedItem.farm_name || 'Sede Principal'}
+                />
+              ) : null}
               <Field label="Stock actual" value={formatQtyWithUnit(selectedItem.current_stock, selectedItem.unit)} />
               <Field label="Stock mínimo" value={formatQtyWithUnit(selectedItem.min_stock, selectedItem.unit)} />
               <Field

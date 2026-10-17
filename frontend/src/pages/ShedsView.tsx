@@ -7,8 +7,10 @@ import { farmService } from '../services/farmService';
 import type { Barn, Species, Farm } from '../types/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { StatusBadge, normalizeIsActive } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
+import { NumberInput } from '../components/ui/NumberInput';
 import { ExportKpiPdfButton } from '../components/common/ExportKpiPdfButton';
 import { safeText } from '../utils/safeText';
 import {
@@ -607,29 +609,12 @@ export const ShedsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* 1. Header with Title & Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-[#263632]">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#1B4D3E]/10 dark:bg-[#4E9F3D]/20 text-[#1B4D3E] dark:text-[#4E9F3D] flex items-center justify-center shrink-0">
-              <Warehouse className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
-                Gestión de Galpones e Infraestructura
-                {activeFarm?.name && !isRoot && (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-[#263632] text-[#1B4D3E] dark:text-[#4E9F3D] font-bold border border-emerald-300 dark:border-emerald-700/50">
-                    {safeText(activeFarm.name)}
-                  </span>
-                )}
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Administración de capacidad, asignación de especies y finalidades productivas por galpón.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
+      <PageHeader
+        icon={<Warehouse className="w-5 h-5" />}
+        badge={activeFarm?.name && !isRoot ? safeText(activeFarm.name) : undefined}
+        title="Gestión de Galpones e Infraestructura"
+        subtitle="Administración de capacidad, asignación de especies y finalidades productivas por galpón."
+      >
           <Button
             variant="outline"
             size="sm"
@@ -720,8 +705,7 @@ export const ShedsView: React.FC = () => {
           >
             Nuevo Galpón
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* 2. Resumen Superior: 4 Tarjetas Métricas (KPI Targets) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1254,8 +1238,7 @@ export const ShedsView: React.FC = () => {
             <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
               Capacidad Máxima (Animales) <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
+            <NumberInput
               min="1"
               step="1"
               placeholder="Ej. 1200"
@@ -1437,8 +1420,7 @@ export const ShedsView: React.FC = () => {
             <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
               Capacidad Máxima (Animales) <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
+            <NumberInput
               min="1"
               step="1"
               value={formMaxCapacity}

@@ -5,8 +5,10 @@ import { subordinateService } from '../../services/subordinateService';
 import { farmService } from '../../services/farmService';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Modal } from '../../components/ui/Modal';
+import { PhoneInput } from '../../components/ui/PhoneInput';
 import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled, CODE_TO_MODULE_ID } from '../../config/modules';
 import type { ModuleId } from '../../types/auth';
 import {
@@ -391,22 +393,13 @@ export const AdminSubordinatesView: React.FC = () => {
     <div className="space-y-6 animate-in fade-in duration-300">
       
       {/* Header Banner replicating Root Admins Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#18221F] p-6 rounded-2xl border border-gray-200 dark:border-[#263632] shadow-sm">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#4E9F3D]/10 text-[#4E9F3D] text-[11px] font-bold mb-1.5 border border-[#4E9F3D]/20">
-            <Building2 className="w-3.5 h-3.5" />
-            <span>{safeText(farmTitle)}</span>
-          </div>
-          <h1 className="text-xl font-black text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
-            <UserCheck className="w-6 h-6 text-[#1B4D3E] dark:text-[#4E9F3D]" />
-            Gestión de Encargados de Campo
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Administra los usuarios operativos de tu granja y asigna los módulos a los que tendrán acceso en campo.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<UserCheck className="w-5 h-5" />}
+        badge={safeText(farmTitle)}
+        badgeIcon={<Building2 className="w-3.5 h-3.5" />}
+        title="Gestión de Encargados de Campo"
+        subtitle="Administra los usuarios operativos de tu granja y asigna los módulos a los que tendrán acceso en campo."
+      >
           <Button
             variant="outline"
             size="sm"
@@ -423,8 +416,7 @@ export const AdminSubordinatesView: React.FC = () => {
           >
             Nuevo Encargado
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Notification Banners */}
       {successMessage && (
@@ -701,8 +693,7 @@ export const AdminSubordinatesView: React.FC = () => {
               <label className="block text-xs font-semibold text-[#1E1E1E] dark:text-gray-300 mb-1">
                 Teléfono de Contacto
               </label>
-              <input
-                type="tel"
+              <PhoneInput
                 placeholder="+58 412 1234567"
                 value={subPhone}
                 onChange={(e) => setSubPhone(e.target.value)}
@@ -873,8 +864,7 @@ export const AdminSubordinatesView: React.FC = () => {
               <label className="block text-xs font-semibold text-[#1E1E1E] dark:text-gray-300 mb-1">
                 Teléfono
               </label>
-              <input
-                type="tel"
+              <PhoneInput
                 value={subPhone}
                 onChange={(e) => setSubPhone(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"

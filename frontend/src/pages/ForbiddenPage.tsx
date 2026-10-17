@@ -30,7 +30,7 @@ export const ForbiddenPage: React.FC = () => {
         </Button>
 
         <Button
-          variant="primary"
+          variant="accent"
           onClick={() => navigate('/dashboard')}
           icon={<Home className="w-4 h-4" />}
         >

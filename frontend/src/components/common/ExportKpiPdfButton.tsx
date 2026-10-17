@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileDown, Loader2 } from 'lucide-react';
+import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -128,26 +129,19 @@ export const ExportKpiPdfButton: React.FC<ExportKpiPdfButtonProps> = ({
   };
 
   return (
-    <button
+    <Button
       type="button"
       translate="no"
+      variant="accent"
+      size="sm"
       onClick={handleExport}
       disabled={isGenerating || disabled}
-      className={`bg-emerald-900 hover:bg-emerald-800 text-white font-medium px-4 py-2 rounded-lg border border-emerald-500/30 flex items-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed text-xs sm:text-sm ${className}`}
+      className={className}
       title="Exportar Reporte Ejecutivo de KPIs en formato PDF institucional"
+      icon={isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
     >
-      {isGenerating ? (
-        <>
-          <Loader2 className="w-4 h-4 animate-spin text-emerald-300" />
-          <span>Generando PDF...</span>
-        </>
-      ) : (
-        <>
-          <FileDown className="w-4 h-4 text-emerald-300" />
-          <span>Exportar KPIs (PDF)</span>
-        </>
-      )}
-    </button>
+      {isGenerating ? 'Generando PDF...' : 'Exportar KPIs (PDF)'}
+    </Button>
   );
 };
 

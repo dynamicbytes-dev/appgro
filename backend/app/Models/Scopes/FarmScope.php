@@ -14,11 +14,10 @@ class FarmScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        if (Auth::check()) {
-            $user = Auth::user();
-            if ($user && $user->role !== 'root' && !empty($user->farm_id)) {
-                $builder->where($model->getTable() . '.farm_id', $user->farm_id);
-            }
+        $user = Auth::guard('api')->user() ?? Auth::user() ?? (function_exists('request') && request() ? request()->user() : null);
+
+        if ($user && $user->role !== 'root' && !empty($user->farm_id)) {
+            $builder->where($model->getTable() . '.farm_id', $user->farm_id);
         }
     }
 }

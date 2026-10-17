@@ -6,8 +6,10 @@ import { farmService } from '../../services/farmService';
 import { getSectorLabel } from './RootFarmsView';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Modal } from '../../components/ui/Modal';
+import { PhoneInput } from '../../components/ui/PhoneInput';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled, CODE_TO_MODULE_ID } from '../../config/modules';
 import type { User, Farm } from '../../types/auth';
@@ -547,18 +549,11 @@ export const RootAdminsView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#18221F] p-6 rounded-2xl border border-gray-200 dark:border-[#263632] shadow-sm">
-        <div>
-          <h1 className="text-xl font-black text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
-            <Users className="w-6 h-6 text-[#1B4D3E] dark:text-[#4E9F3D]" />
-            Gestión de Administradores de Granja
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Conectado a la API PostgreSQL mediante token JWT para administración de cuentas y granjas.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<Users className="w-5 h-5" />}
+        title="Gestión de Administradores de Granja"
+        subtitle="Conectado a la API PostgreSQL mediante token JWT para administración de cuentas y granjas."
+      >
           <Button variant="outline" size="sm" onClick={() => { loadAdmins(); loadFarms(); }} icon={<RefreshCw className="w-3.5 h-3.5" />}>
             Actualizar API
           </Button>
@@ -570,8 +565,7 @@ export const RootAdminsView: React.FC = () => {
           >
             Registrar Administrador
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Banners */}
       {successMessage && (
@@ -857,8 +851,7 @@ export const RootAdminsView: React.FC = () => {
               <label className="block text-xs font-semibold text-[#1E1E1E] dark:text-gray-300 mb-1">
                 Teléfono de Contacto
               </label>
-              <input
-                type="text"
+              <PhoneInput
                 placeholder="+58 414 1234567"
                 value={adminPhone}
                 onChange={(e) => setAdminPhone(e.target.value)}
@@ -1003,8 +996,7 @@ export const RootAdminsView: React.FC = () => {
               <label className="block text-xs font-semibold text-[#1E1E1E] dark:text-gray-300 mb-1">
                 Teléfono de Contacto
               </label>
-              <input
-                type="text"
+              <PhoneInput
                 value={adminPhone}
                 onChange={(e) => setAdminPhone(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"

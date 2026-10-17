@@ -5,6 +5,7 @@ import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled, CODE_TO_MODUL
 import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Modal } from '../../components/ui/Modal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
@@ -409,18 +410,11 @@ export const RootFarmsView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#18221F] p-6 rounded-2xl border border-gray-200 dark:border-[#263632] shadow-sm">
-        <div>
-          <h1 className="text-xl font-black text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
-            <Building2 className="w-6 h-6 text-[#1B4D3E] dark:text-[#4E9F3D]" />
-            Gestión de Granjas
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Administración simplificada: Selector de Sector Pecuario, Ubicación y código automático.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={<Building2 className="w-5 h-5" />}
+        title="Gestión de Granjas"
+        subtitle="Administración simplificada: Selector de Sector Pecuario, Ubicación y código automático."
+      >
           <Button variant="outline" size="sm" onClick={loadFarms} icon={<RefreshCw className="w-3.5 h-3.5" />}>
             Actualizar
           </Button>
@@ -435,8 +429,7 @@ export const RootFarmsView: React.FC = () => {
           >
             Nueva Granja
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Banners */}
       {successMessage && (

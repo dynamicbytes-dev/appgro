@@ -16,8 +16,10 @@ import type {
 } from '../types/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { normalizeIsActive } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
+import { NumberInput } from '../components/ui/NumberInput';
 import { ExportKpiPdfButton } from '../components/common/ExportKpiPdfButton';
 import { generatePigIndividualPdf } from '../utils/zootikaPigPdfGenerator';
 import { safeText } from '../utils/safeText';
@@ -1514,29 +1516,12 @@ export const LotesView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* 1. Header con título y acciones */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-gray-200 dark:border-[#263632]">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[#1B4D3E]/10 dark:bg-[#4E9F3D]/20 text-[#1B4D3E] dark:text-[#4E9F3D] flex items-center justify-center shrink-0">
-              <Boxes className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
-                Gestión de Lotes de Producción
-                {activeFarm?.name && !isRoot && (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-[#263632] text-[#1B4D3E] dark:text-[#4E9F3D] font-bold border border-emerald-300 dark:border-emerald-700/50">
-                    {safeText(activeFarm.name)}
-                  </span>
-                )}
-              </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                Control de cupos, cosechas, producción de huevos y reproducción por lote.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
+      <PageHeader
+        icon={<Boxes className="w-5 h-5" />}
+        badge={activeFarm?.name && !isRoot ? safeText(activeFarm.name) : undefined}
+        title="Gestión de Lotes de Producción"
+        subtitle="Control de cupos, cosechas, producción de huevos y reproducción por lote."
+      >
           <Button
             variant="outline"
             size="sm"
@@ -1547,6 +1532,7 @@ export const LotesView: React.FC = () => {
             Actualizar
           </Button>
           {(() => {
+            // Totales de postura y propósito
             const totalGoodEggs = lotsList.reduce(
               (acc, l) => acc + (Number(l.total_eggs) || 0),
               0
@@ -1555,70 +1541,211 @@ export const LotesView: React.FC = () => {
               (acc, l) => acc + (Number(l.broken_eggs) || 0),
               0
             );
+            const totalEggs = totalGoodEggs + totalBrokenEggs;
+            const postureEfficiency =
+              totalEggs > 0
+                ? ((totalGoodEggs / totalEggs) * 100).toFixed(1) + '%'
+                : '100%';
+
+            // Población viva actual y lotes
+            const inProd = stats.in_production_animals ?? stats.total_animals;
+            const closedLots = Math.max(
+              0,
+              (stats.total_lotes ?? lotsList.length) - (stats.active_lotes ?? 0)
+            );
+
+            // Totales de cosecha
+            const harvestedLots = lotsList.filter(
+              (l) =>
+                Boolean(l.harvest_date) ||
+                (Number(l.total_weight) || 0) > 0 ||
+                (Number(l.harvest_cost) || 0) > 0 ||
+                l.status === 'inactivo'
+            );
+            const totalHarvestWeight = lotsList.reduce(
+              (acc, l) => acc + (Number(l.total_weight) || 0),
+              0
+            );
+            const totalHarvestAnimals = lotsList.reduce((acc, l) => {
+              const hasHarvest =
+                Boolean(l.harvest_date) ||
+                (Number(l.harvest_cost) || 0) > 0 ||
+                (Number(l.total_weight) || 0) > 0;
+              if (!hasHarvest) return acc;
+              const initialQty = Number(l.quantity) || 0;
+              const occ = Number(l.current_occupancy ?? 0);
+              const diff = initialQty - occ;
+              return acc + (diff > 0 ? diff : initialQty);
+            }, 0);
+
+            // Costos consolidados: Cosecha + Producción del Propósito (Huevos Buenos)
+            const totalEggCost = lotsList.reduce(
+              (acc, l) => acc + (Number(l.total_egg_cost) || 0),
+              0
+            );
             const totalHarvestCost = lotsList.reduce(
               (acc, l) => acc + (Number(l.harvest_cost) || 0),
               0
             );
-            const inProd = stats.in_production_animals ?? stats.total_animals;
+            const totalCombinedCost = totalHarvestCost + totalEggCost;
+
+            // Producción del Propósito (resumen para KPI 2)
+            const kpi2Value =
+              totalEggs > 0
+                ? `${totalGoodEggs.toLocaleString()} buenos / ${totalBrokenEggs.toLocaleString()} rotos`
+                : `${stats.active_lotes} lotes activos`;
+            const kpi2Subtitle =
+              totalEggs > 0
+                ? `${postureEfficiency} postura útil acumulada`
+                : 'Ciclo productivo en curso';
+
+            // Volumen Total Cosechado (KPI 3)
+            const kpi3Value =
+              totalHarvestWeight > 0
+                ? `${totalHarvestWeight.toLocaleString('es-ES', { maximumFractionDigits: 1 })} kg`
+                : totalHarvestAnimals > 0
+                ? `${totalHarvestAnimals.toLocaleString()} anim.`
+                : `${harvestedLots.length} lotes`;
+            const kpi3Subtitle =
+              totalHarvestAnimals > 0 && totalHarvestWeight > 0
+                ? `${totalHarvestAnimals.toLocaleString()} animales cosechados`
+                : `${harvestedLots.length} lotes con cosecha liquidada`;
+
             return (
               <ExportKpiPdfButton
                 moduleTitle="Módulo de Lotes Pecuarios"
                 moduleSlug="lotes"
                 kpis={[
                   {
-                    title: 'Lotes Activos',
-                    value: `${stats.active_lotes} / ${stats.total_lotes}`,
-                    subtitle: 'Lotes en producción',
+                    title: 'Lotes y Población Activa',
+                    value: `${stats.active_lotes} activos (${closedLots} cerr.)`,
+                    subtitle: `${inProd.toLocaleString()} animales vivos en galpones`,
                     tone: 'emerald',
                   },
                   {
-                    title: 'Población Pecuaria',
-                    value: `${inProd.toLocaleString()} animales`,
-                    subtitle: 'Animales vivos en lotes',
-                    tone: 'slate',
-                  },
-                  {
-                    title: 'Huevos (Buenos vs Rotos)',
-                    value: `${totalGoodEggs.toLocaleString()} / ${totalBrokenEggs.toLocaleString()}`,
-                    subtitle: 'Postura acumulada / mermas',
+                    title: 'Producción del Propósito',
+                    value: kpi2Value,
+                    subtitle: kpi2Subtitle,
                     tone: totalBrokenEggs > totalGoodEggs * 0.08 ? 'amber' : 'emerald',
                   },
                   {
-                    title: 'Costo Total Cosecha',
-                    value: `$${totalHarvestCost.toLocaleString('es-ES', {
+                    title: 'Volumen Total Cosechado',
+                    value: kpi3Value,
+                    subtitle: kpi3Subtitle,
+                    tone: 'slate',
+                  },
+                  {
+                    title: 'Costo Cosecha y Prod.',
+                    value: `$${totalCombinedCost.toLocaleString('es-ES', {
                       minimumFractionDigits: 2,
                     })}`,
-                    subtitle: 'Liquidación de cosecha',
+                    subtitle: `Cosecha: $${totalHarvestCost.toLocaleString('es-ES', {
+                      minimumFractionDigits: 0,
+                    })} + Prod: $${totalEggCost.toLocaleString('es-ES', {
+                      minimumFractionDigits: 0,
+                    })}`,
                     tone: 'slate',
                   },
                 ]}
-                diagnosis={`Seguimiento de ${stats.active_lotes} lotes activos con ${inProd.toLocaleString()} animales en producción. Acumulado de postura: ${totalGoodEggs.toLocaleString()} huevos comerciales vs. ${totalBrokenEggs.toLocaleString()} mermas. Costo total de cosecha liquidado: $${totalHarvestCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })}.`}
+                diagnosis={`Balance operacional de lotes: ${stats.active_lotes} lotes activos y ${closedLots} cerrados con ${inProd.toLocaleString()} animales vivos en galpones. Rendimiento del propósito: ${totalEggs > 0 ? `${totalGoodEggs.toLocaleString()} huevos comerciales sin mermas (${postureEfficiency} de eficiencia neta) y ${totalBrokenEggs.toLocaleString()} descartes` : `${stats.active_lotes} lotes en ciclo productivo regular`}. Avance de cosecha: ${harvestedLots.length} lotes procesados (${totalHarvestAnimals > 0 ? `${totalHarvestAnimals.toLocaleString()} animales y ` : ''}${totalHarvestWeight.toLocaleString('es-ES', { maximumFractionDigits: 1 })} kg cosechados) con una consolidación financiera total de $${totalCombinedCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} (Cosecha: $${totalHarvestCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} + Prod. Propósito: $${totalEggCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })}).`}
                 columns={[
-                  'Código',
-                  'Galpón',
-                  'Especie / Sector',
+                  'Código / Lote',
+                  'Especie / Galpón',
                   'Propósito',
-                  'Población',
-                  'Huevos Buenos',
-                  'Mermas',
-                  'Costo Cosecha',
+                  'Población Viva',
+                  'Producción del Propósito',
+                  'Lo Cosechado (Cant. / Peso)',
+                  'Costo Total (Prod. + Cosecha)',
                   'Estado',
                 ]}
-                rows={lotsList.map((l) => [
-                  l.code,
-                  safeText(l.galpon?.name, `Galpón #${l.galpon_id}`),
-                  safeText(l.species?.name, l.sector || 'General'),
-                  safeText(l.purpose, 'Producción'),
-                  String(l.current_occupancy ?? l.quantity ?? 0),
-                  Number(l.total_eggs || 0) > 0 ? Number(l.total_eggs).toLocaleString() : '—',
-                  Number(l.broken_eggs || 0) > 0 ? Number(l.broken_eggs).toLocaleString() : '—',
-                  Number(l.harvest_cost || 0) > 0
-                    ? `$${Number(l.harvest_cost).toLocaleString('es-ES', {
-                        minimumFractionDigits: 2,
-                      })}`
-                    : '—',
-                  l.status === 'activo' ? 'Activo' : 'Inactivo',
-                ])}
+                rows={lotsList.map((l) => {
+                  // Propósito normalizado
+                  let purposeLabel = safeText(l.purpose, 'Producción');
+                  if (isEggPurpose(l.purpose)) {
+                    purposeLabel = 'Postura';
+                  } else if (isReproductionPurpose(l.purpose)) {
+                    purposeLabel = 'Reproducción';
+                  } else if (normalizeKey(l.purpose) === 'carne') {
+                    purposeLabel = 'Carne';
+                  }
+
+                  // Población viva actual
+                  const viva = Number((l.current_occupancy ?? l.quantity) || 0);
+
+                  // Producción del propósito
+                  const goodEggs = Number(l.total_eggs) || 0;
+                  const brokenEggs = Number(l.broken_eggs) || 0;
+                  const lotEggs = goodEggs + brokenEggs;
+                  let prodProposito = '—';
+                  if (isEggPurpose(l.purpose) || lotEggs > 0) {
+                    prodProposito =
+                      lotEggs > 0
+                        ? `${lotEggs.toLocaleString()} huevos (${goodEggs.toLocaleString()} buenos / ${brokenEggs.toLocaleString()} rotos)`
+                        : '0 huevos';
+                  } else if (isReproductionPurpose(l.purpose)) {
+                    prodProposito = 'Reproducción / Crías';
+                  } else {
+                    prodProposito = 'Engorde / Carne';
+                  }
+
+                  // Lo Cosechado (Cant. / Peso)
+                  const lotWeight = Number(l.total_weight) || 0;
+                  const lotHarvestCost = Number(l.harvest_cost) || 0;
+                  const initialQty = Number(l.quantity) || 0;
+                  const currentOcc = Number(l.current_occupancy ?? l.quantity) || 0;
+                  const lotHarvestedQty =
+                    initialQty > currentOcc
+                      ? initialQty - currentOcc
+                      : l.harvest_date
+                      ? initialQty
+                      : 0;
+
+                  let cosechadoText = 'En producción (0 kg)';
+                  if (lotWeight > 0 && lotHarvestedQty > 0) {
+                    cosechadoText = `${lotHarvestedQty.toLocaleString()} anim. (${lotWeight.toLocaleString('es-ES', { maximumFractionDigits: 1 })} kg)`;
+                  } else if (lotWeight > 0) {
+                    cosechadoText = `${lotWeight.toLocaleString('es-ES', { maximumFractionDigits: 1 })} kg`;
+                  } else if (lotHarvestedQty > 0) {
+                    cosechadoText = `${lotHarvestedQty.toLocaleString()} anim. cosechados`;
+                  } else if (l.harvest_date) {
+                    cosechadoText = `Cosechado (${String(l.harvest_date).slice(0, 10)})`;
+                  } else if (lotHarvestCost > 0) {
+                    cosechadoText = `$${lotHarvestCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} liquidado`;
+                  } else if (l.status !== 'activo') {
+                    cosechadoText = 'Cerrado / Cosechado';
+                  }
+
+                  // Costo Total (Prod. + Cosecha)
+                  const lotTotalCost =
+                    lotHarvestCost + (Number(l.total_egg_cost) || 0);
+                  const formattedCost =
+                    lotTotalCost > 0
+                      ? `$${lotTotalCost.toLocaleString('es-ES', {
+                          minimumFractionDigits: 2,
+                        })}`
+                      : '—';
+
+                  // Estado
+                  const estadoText =
+                    l.status === 'activo'
+                      ? 'Activo'
+                      : l.harvest_date || lotHarvestCost > 0
+                      ? 'Cerrado / Cosechado'
+                      : 'Cerrado';
+
+                  const especieGalpon = `${safeText(l.species?.name, l.sector || 'General')} • ${safeText(l.galpon?.name, l.galpon_id ? `Galpón #${l.galpon_id}` : 'Sin galpón')}`;
+
+                  return [
+                    l.code,
+                    especieGalpon,
+                    purposeLabel,
+                    `${viva.toLocaleString()} anim.`,
+                    prodProposito,
+                    cosechadoText,
+                    formattedCost,
+                    estadoText,
+                  ];
+                })}
               />
             );
           })()}
@@ -1630,8 +1757,7 @@ export const LotesView: React.FC = () => {
           >
             Nuevo Lote
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* 2. Resumen superior: 4 tarjetas métricas (targets) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2400,8 +2526,7 @@ export const LotesView: React.FC = () => {
             <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
               Cantidad de Animales <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
+            <NumberInput
               min="1"
               step="1"
               max={availableCapacity || undefined}
@@ -2456,8 +2581,7 @@ export const LotesView: React.FC = () => {
             <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
               Costo de Inversión en Animales <span className="text-gray-400 font-medium normal-case">(opcional)</span>
             </label>
-            <input
-              type="number"
+            <NumberInput
               min="0"
               step="0.01"
               placeholder="Ej. 1500.00 — valor de compra del lote"
@@ -2618,8 +2742,7 @@ export const LotesView: React.FC = () => {
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
                               Partos (paridad)
                             </label>
-                            <input
-                              type="number"
+                            <NumberInput
                               min="0"
                               step="1"
                               placeholder="Ej. 3"
@@ -2638,8 +2761,7 @@ export const LotesView: React.FC = () => {
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
                               Pezones
                             </label>
-                            <input
-                              type="number"
+                            <NumberInput
                               min="0"
                               step="1"
                               placeholder="Ej. 14"
@@ -2658,8 +2780,7 @@ export const LotesView: React.FC = () => {
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
                               Promedio de Lechones por Parto
                             </label>
-                            <input
-                              type="number"
+                            <NumberInput
                               min="0"
                               step="0.1"
                               placeholder="Ej. 11.5"
@@ -2738,8 +2859,7 @@ export const LotesView: React.FC = () => {
               <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
                 Cantidad de Animales <span className="text-red-500">*</span>
               </label>
-              <input
-                type="number"
+              <NumberInput
                 min="1"
                 step="1"
                 value={editQuantity}
@@ -2769,8 +2889,7 @@ export const LotesView: React.FC = () => {
               <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
                 Costo de Inversión en Animales
               </label>
-              <input
-                type="number"
+              <NumberInput
                 min="0"
                 step="0.01"
                 placeholder="Ej. 1500.00 — dejar vacío para limpiar"
@@ -3016,8 +3135,7 @@ export const LotesView: React.FC = () => {
               <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
                 Cantidad a Cosechar
               </label>
-              <input
-                type="number"
+              <NumberInput
                 min="1"
                 max={Number(selectedLot.quantity || 0)}
                 step="1"
@@ -3049,8 +3167,7 @@ export const LotesView: React.FC = () => {
                 Peso Promedio (kg) {!isEggPurpose(selectedLot.purpose) && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
-                <input
-                  type="number"
+                <NumberInput
                   min="0"
                   step="0.01"
                   placeholder="Ej. 120.50"
@@ -3069,8 +3186,7 @@ export const LotesView: React.FC = () => {
                 Precio por Kilo {!isEggPurpose(selectedLot.purpose) && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
-                <input
-                  type="number"
+                <NumberInput
                   min="0"
                   step="0.01"
                   placeholder="Ej. 3.25"
@@ -3135,8 +3251,7 @@ export const LotesView: React.FC = () => {
               <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
                 Huevos Completos <span className="text-red-500">*</span>
               </label>
-              <input
-                type="number"
+              <NumberInput
                 min="0"
                 step="1"
                 placeholder="Ej. 1000"
@@ -3152,8 +3267,7 @@ export const LotesView: React.FC = () => {
               <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
                 Huevos Rotos (mermas)
               </label>
-              <input
-                type="number"
+              <NumberInput
                 min="0"
                 step="1"
                 placeholder="Ej. 40"
@@ -3170,8 +3284,7 @@ export const LotesView: React.FC = () => {
                 Precio Unitario por Huevo <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <input
-                  type="number"
+                <NumberInput
                   min="0"
                   step="0.001"
                   placeholder="Ej. 0.25"
@@ -3261,20 +3374,22 @@ export const LotesView: React.FC = () => {
                 <strong>{lotAnimals.length}</strong> cerdos registrados en este lote
               </span>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
+                <Button
+                  variant="accent"
+                  size="sm"
                   onClick={handleExportAllPigsPdf}
                   disabled={isExportingPigPdf || lotAnimals.length === 0}
-                  className="bg-emerald-900 hover:bg-emerald-800 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-emerald-500/30 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
                   title="Exportar fichas técnicas de todos los cerdos en PDF"
+                  icon={
+                    isExportingPigPdf ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <FileDown className="w-3.5 h-3.5" />
+                    )
+                  }
                 >
-                  {isExportingPigPdf ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <FileDown className="w-3.5 h-3.5" />
-                  )}
-                  <span>{isExportingPigPdf ? 'Generando...' : 'Exportar Fichas (PDF)'}</span>
-                </button>
+                  {isExportingPigPdf ? 'Generando...' : 'Exportar Fichas (PDF)'}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -3538,8 +3653,7 @@ export const LotesView: React.FC = () => {
               <>
                 <div>
                   <label className="block text-[11px] font-bold uppercase mb-1">Partos (paridad)</label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min="0"
                     step="1"
                     value={animalEditForm.parity_count}
@@ -3549,8 +3663,7 @@ export const LotesView: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold uppercase mb-1">Pezones</label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min="0"
                     step="1"
                     value={animalEditForm.teats_count}
@@ -3560,8 +3673,7 @@ export const LotesView: React.FC = () => {
                 </div>
                 <div className="col-span-1 md:col-span-2">
                   <label className="block text-[11px] font-bold uppercase mb-1">Promedio de Lechones por Parto</label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min="0"
                     step="0.1"
                     value={animalEditForm.avg_piglets_per_birth}
@@ -3599,8 +3711,7 @@ export const LotesView: React.FC = () => {
                 Peso (kg) <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <input
-                  type="number"
+                <NumberInput
                   min="0"
                   step="0.01"
                   placeholder="Ej. 115.5"
@@ -3619,8 +3730,7 @@ export const LotesView: React.FC = () => {
                 Precio por Kilo <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <input
-                  type="number"
+                <NumberInput
                   min="0"
                   step="0.01"
                   placeholder="Ej. 3.50"
@@ -3726,8 +3836,7 @@ export const LotesView: React.FC = () => {
                   <label className="block text-[11px] font-bold uppercase mb-1">
                     Total de Lechones <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min="1"
                     step="1"
                     placeholder="Ej. 12"
@@ -3743,8 +3852,7 @@ export const LotesView: React.FC = () => {
                   <label className="block text-[11px] font-bold uppercase mb-1">
                     Lechones Vivos <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min="0"
                     step="1"
                     placeholder="Ej. 11"

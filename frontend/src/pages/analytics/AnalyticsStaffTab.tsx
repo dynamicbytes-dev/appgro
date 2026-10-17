@@ -85,7 +85,7 @@ export const AnalyticsStaffTab: React.FC<AnalyticsStaffTabProps> = ({ farmId }) 
               : 'Cumplimiento, cargas de trabajo y tiempos de respuesta del personal.'}
           </p>
         </div>
-        <Button variant="outline" onClick={() => void load()} icon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="sm" onClick={() => void load()} icon={<RefreshCw className="w-4 h-4" />}>
           Actualizar
         </Button>
       </div>

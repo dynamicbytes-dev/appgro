@@ -121,6 +121,8 @@ export const INVENTORY_ALERT_LABELS: Record<InventoryAlertFlag, string> = {
 export interface InventoryItem {
   id: number;
   farm_id: number;
+  farm?: { id: number; name: string; code?: string } | null;
+  farm_name?: string | null;
   code: string;
   name: string;
   category: InventoryCategory | string;
@@ -155,12 +157,14 @@ export interface InventoryItem {
 }
 
 /* ------------------------------------------------------------------ */
-/* Movimiento                                                          */
+/* Movimiento                                                         */
 /* ------------------------------------------------------------------ */
 
 export interface InventoryMovement {
   id: number;
   farm_id: number;
+  farm?: { id: number; name: string; code?: string } | null;
+  farm_name?: string | null;
   inventory_item_id: number;
   type: InventoryMovementType;
   type_label?: string;

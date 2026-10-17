@@ -34,21 +34,23 @@ class InventoryLotController extends Controller
         }
 
         $query = InventoryLot::query()->with([
+            'farm:id,name',
             'item:id,code,name,unit',
             'supplier:id,name',
             'creator:id,name,lastname',
         ]);
 
         if ($user->isRoot()) {
-            if ($request->filled('farm_id') && strtolower(trim((string) $request->farm_id)) !== 'all') {
-                $query->where('farm_id', (int) $request->farm_id);
+            $farmId = $request->input('farm_id') ?? $request->input('farmId');
+            if ($farmId !== null && $farmId !== '' && strtolower(trim((string) $farmId)) !== 'all') {
+                $query->where('farm_id', (int) $farmId);
             }
         } else {
             if (! $user->farm_id) {
                 return $this->error('Usuario sin granja asignada.', Response::HTTP_FORBIDDEN);
             }
 
-            $query->where('farm_id', (int) $user->farm_id);
+            $query->where('farm_id', (int) $user->farm_id)->whereNotNull('farm_id');
         }
 
         // Lotes de un insumo concreto, incluyendo los aún no asignados.
@@ -343,12 +345,16 @@ class InventoryLotController extends Controller
      */
     protected function decorate(InventoryLot $lot): array
     {
+        $farmRelation = $lot->relationLoaded('farm') ? $lot->getRelation('farm') : null;
+
         return array_merge($lot->toArray(), [
             'label' => $lot->label(),
             'item_code' => $lot->item?->code,
             'item_name' => $lot->item?->name,
             'item_unit' => $lot->item?->unit,
             'supplier_name' => $lot->supplier?->name,
+            'farm_name' => $farmRelation?->name,
+            'farm' => $farmRelation ? ['id' => $farmRelation->id, 'name' => $farmRelation->name] : null,
             'is_expired' => $lot->isExpired(),
             'is_expiring_soon' => $lot->isExpiringSoon(),
         ]);

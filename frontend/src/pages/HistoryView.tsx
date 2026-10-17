@@ -6,6 +6,7 @@ import { farmService } from '../services/farmService';
 import type { Farm } from '../types/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { ExportKpiPdfButton } from '../components/common/ExportKpiPdfButton';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -452,41 +453,13 @@ export const HistoryView: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {/* 1. Descriptive Header Bar with Role Context */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-[#18221F] p-6 rounded-2xl border border-gray-200 dark:border-[#263632] shadow-sm">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${
-                isRoot
-                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20'
-                  : 'bg-[#1B4D3E]/10 dark:bg-[#4E9F3D]/20 text-[#1B4D3E] dark:text-[#4E9F3D] border-[#1B4D3E]/20 dark:border-[#4E9F3D]/30'
-              }`}
-            >
-              {isRoot ? (
-                <ShieldCheck className="w-3.5 h-3.5" />
-              ) : (
-                <Building2 className="w-3.5 h-3.5" />
-              )}
-              <span>{safeText(headerBadgeText)}</span>
-            </span>
-
-            {!isRoot && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 dark:bg-[#263632] text-gray-600 dark:text-gray-300 text-[10px] font-semibold border border-gray-200 dark:border-gray-700">
-                Ámbito: Granja Propia
-              </span>
-            )}
-          </div>
-
-          <h1 className="text-xl font-black text-[#1E1E1E] dark:text-gray-100 flex items-center gap-2">
-            <History className="w-6 h-6 text-[#1B4D3E] dark:text-[#4E9F3D]" />
-            {safeText(headerTitle)}
-          </h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {safeText(headerSubtitle)}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
+      <PageHeader
+        icon={<History className="w-5 h-5" />}
+        badge={safeText(headerBadgeText)}
+        badgeIcon={isRoot ? <ShieldCheck className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
+        title={safeText(headerTitle)}
+        subtitle={safeText(headerSubtitle)}
+      >
           <ExportKpiPdfButton
             moduleTitle="Historial de Actividades y Auditoría"
             moduleSlug="historial_actividades"
@@ -519,8 +492,7 @@ export const HistoryView: React.FC = () => {
           >
             Limpiar Filtros
           </Button>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* 2. Quick Summary Stats Cards (KPIs) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

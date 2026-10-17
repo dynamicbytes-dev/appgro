@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
@@ -321,21 +322,12 @@ export const AdminActivitiesView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-[#1B4D3E] dark:text-[#6DBF5C]" />
-            <h1 className="text-2xl font-extrabold text-[#1E1E1E] dark:text-gray-100 tracking-tight">
-              Actividades
-            </h1>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Crea tareas y asígnalas a tu personal. {stats ? `${stats.total} en total.` : ''}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
+      <PageHeader
+        icon={<ClipboardList className="w-5 h-5" />}
+        title="Actividades"
+        subtitle={`Crea tareas y asígnalas a tu personal. ${stats ? `${stats.total} en total.` : ''}`}
+      >
+          <Button variant="outline" size="sm" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
             Actualizar
           </Button>
           <ExportKpiPdfButton
@@ -383,12 +375,11 @@ export const AdminActivitiesView: React.FC = () => {
             ])}
           />
           {canManageActivities && (
-            <Button variant="accent" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
+            <Button variant="accent" size="sm" onClick={openCreateModal} icon={<Plus className="w-4 h-4" />}>
               Nueva Actividad
             </Button>
           )}
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Stats cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

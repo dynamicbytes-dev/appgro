@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { PageHeader } from '../components/ui/PageHeader';
 import { SYSTEM_MODULES } from '../config/modules';
 import { activityService } from '../services/activityService';
 import {
@@ -88,24 +89,17 @@ export const EncargadoDashboard: React.FC = () => {
     <div className="space-y-6">
       
       {/* Top Operational Banner */}
-      <div className="bg-gradient-to-r from-[#1B4D3E] to-[#143A2F] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-bold mb-3 border border-blue-400/40">
-            <ClipboardCheck className="w-3.5 h-3.5 mr-1.5" /> Panel Operativo de Campo (Encargado)
+      <PageHeader
+        icon={<ClipboardCheck className="w-5 h-5" />}
+        badge="Panel Operativo de Campo (Encargado)"
+        title={`Hola, ${safeText(user?.name, 'Encargado')}`}
+        subtitle={`${safeText(user?.farmName || activeFarm?.name, 'Granja Agropecuaria')} — Tareas de campo, registro de bitácora y monitoreo de lotes asignados por tu Administrador.`}
+      >
+          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#4E9F3D]/10 text-[#1B4D3E] dark:text-[#6DBF5C] text-xs font-semibold border border-[#4E9F3D]/20">
+            <Clock className="w-4 h-4" />
+            <span>Turno Activo • Hoy 08:00 AM</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Hola, {safeText(user?.name, 'Encargado')}
-          </h1>
-          <p className="text-emerald-100/80 text-sm mt-1 max-w-2xl">
-            {safeText(user?.farmName || activeFarm?.name, 'Granja Agropecuaria')} — Tareas de campo, registro de bitácora y monitoreo de lotes asignados por tu Administrador.
-          </p>
-        </div>
-
-        <div className="bg-[#143A2F] px-4 py-2.5 rounded-2xl border border-[#256653] text-xs text-emerald-100 flex items-center gap-2">
-          <Clock className="w-4 h-4 text-[#4E9F3D]" />
-          <span>Turno Activo • Hoy 08:00 AM</span>
-        </div>
-      </div>
+      </PageHeader>
 
       {/* Security Context Banner */}
       <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-[#263632] flex items-center justify-between">
