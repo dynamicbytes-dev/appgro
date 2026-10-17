@@ -19,6 +19,7 @@ import { Button } from '../components/ui/Button';
 import { normalizeIsActive } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { ExportKpiPdfButton } from '../components/common/ExportKpiPdfButton';
+import { generatePigIndividualPdf } from '../utils/zootikaPigPdfGenerator';
 import { safeText } from '../utils/safeText';
 import {
   Boxes,
@@ -48,6 +49,8 @@ import {
   Calendar,
   Warehouse,
   Layers,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -287,6 +290,8 @@ export const LotesView: React.FC = () => {
   const [selectedAnimal, setSelectedAnimal] = useState<LoteAnimal | null>(null);
   const [lotAnimals, setLotAnimals] = useState<LoteAnimal[]>([]);
   const [isLoadingAnimals, setIsLoadingAnimals] = useState(false);
+  const [isExportingPigPdf, setIsExportingPigPdf] = useState(false);
+  const [exportingPigId, setExportingPigId] = useState<number | null>(null);
   // Secuencia de peticiones de animales (evita que respuestas fuera de orden
   // sobrescriban la lista de otro lote)
   const animalsReqSeqRef = useRef(0);
@@ -1070,6 +1075,67 @@ export const LotesView: React.FC = () => {
       setIsLoadingAnimals(false);
     }
   }, [selectedLot, refreshLotAnimals]);
+
+  // Exportar Ficha Técnica Individual de un cerdo específico
+  const handleExportSinglePigPdf = async (animal: LoteAnimal) => {
+    if (!selectedLot) return;
+    setExportingPigId(animal.id);
+    try {
+      let servicesList = animal.services || [];
+      if (!servicesList || servicesList.length === 0) {
+        try {
+          servicesList = await lotService.getServices(animal.id);
+        } catch {
+          servicesList = [];
+        }
+      }
+
+      await generatePigIndividualPdf({
+        lot: selectedLot,
+        pigs: [{ ...animal, services: servicesList }],
+        farmName: activeFarm?.name || user?.farm?.name || 'Granja Zootika',
+        farmCode: activeFarm?.code || user?.farm?.code || '',
+        userName: user?.name || user?.email || 'Administrador de Granja',
+        userRole: user?.role ? user.role.toUpperCase() : 'ADMIN',
+      });
+
+      toastSuccess(
+        'Ficha Técnica Generada',
+        `Se descargó la ficha técnica oficial del cerdo #${animal.identifier || animal.id}.`
+      );
+    } catch (err: any) {
+      console.error('Error al exportar ficha porcina:', err);
+      toastError('Error al exportar', err?.message || 'No se pudo generar la ficha técnica del cerdo.');
+    } finally {
+      setExportingPigId(null);
+    }
+  };
+
+  // Exportar Fichas Técnicas Individuales de todos los cerdos del lote
+  const handleExportAllPigsPdf = async () => {
+    if (!selectedLot || lotAnimals.length === 0) return;
+    setIsExportingPigPdf(true);
+    try {
+      await generatePigIndividualPdf({
+        lot: selectedLot,
+        pigs: lotAnimals,
+        farmName: activeFarm?.name || user?.farm?.name || 'Granja Zootika',
+        farmCode: activeFarm?.code || user?.farm?.code || '',
+        userName: user?.name || user?.email || 'Administrador de Granja',
+        userRole: user?.role ? user.role.toUpperCase() : 'ADMIN',
+      });
+
+      toastSuccess(
+        'Fichas Porcinas Generadas',
+        `Se descargaron las fichas individuales de los ${lotAnimals.length} cerdos del lote ${selectedLot.code}.`
+      );
+    } catch (err: any) {
+      console.error('Error al exportar fichas porcinas del lote:', err);
+      toastError('Error al exportar', err?.message || 'No se pudieron generar las fichas del lote.');
+    } finally {
+      setIsExportingPigPdf(false);
+    }
+  };
 
   // Edición de animal
   const openAnimalEditModal = (animal: LoteAnimal) => {
@@ -3190,18 +3256,34 @@ export const LotesView: React.FC = () => {
               </div>
             )}
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-[11px] text-gray-500">
                 <strong>{lotAnimals.length}</strong> cerdos registrados en este lote
               </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefreshAnimals}
-                icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoadingAnimals ? 'animate-spin' : ''}`} />}
-              >
-                Recargar
-              </Button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportAllPigsPdf}
+                  disabled={isExportingPigPdf || lotAnimals.length === 0}
+                  className="bg-emerald-900 hover:bg-emerald-800 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 border border-emerald-500/30 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                  title="Exportar fichas técnicas de todos los cerdos en PDF"
+                >
+                  {isExportingPigPdf ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <FileDown className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isExportingPigPdf ? 'Generando...' : 'Exportar Fichas (PDF)'}</span>
+                </button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefreshAnimals}
+                  icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoadingAnimals ? 'animate-spin' : ''}`} />}
+                >
+                  Recargar
+                </Button>
+              </div>
             </div>
 
             {/* Contenedor estable para evitar errores de sincronización del DOM */}
@@ -3345,6 +3427,20 @@ export const LotesView: React.FC = () => {
                                   className="p-1.5 text-gray-400 hover:text-[#1B4D3E] dark:hover:text-[#4E9F3D] hover:bg-gray-100 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
                                 >
                                   <History className="w-4 h-4" />
+                                </button>
+                                {/* Exportar Ficha Técnica PDF Individual */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleExportSinglePigPdf(animal)}
+                                  disabled={exportingPigId === animal.id}
+                                  title="Exportar ficha PDF del ejemplar"
+                                  className="p-1.5 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  {exportingPigId === animal.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin text-emerald-700" />
+                                  ) : (
+                                    <FileDown className="w-4 h-4 text-emerald-700 hover:text-emerald-900" />
+                                  )}
                                 </button>
                               </div>
                             </td>

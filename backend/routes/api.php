@@ -20,6 +20,8 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Root\RootAdminController;
 use App\Http\Controllers\Root\RootDashboardController;
 use App\Http\Controllers\Root\RootFarmController;
+use App\Http\Controllers\PigController;
+use App\Http\Controllers\LotAnimalController;
 use App\Http\Controllers\SpeciesController;
 use App\Http\Controllers\SubordinateController;
 use Illuminate\Support\Facades\Route;
@@ -268,6 +270,27 @@ $registerRoutes = function () {
             Route::get('animals/{animalId}/services', [LotController::class, 'services']);
             Route::post('animals/{animalId}/services', [LotController::class, 'storeService']);
             Route::delete('services/{serviceId}', [LotController::class, 'destroyService']);
+        });
+
+        // Cerdos / Animales Individuales por Lote (PigController / LotAnimalController)
+        Route::middleware('module.access:lots')->prefix('pigs')->group(function () {
+            Route::get('stats', [PigController::class, 'stats']);
+            Route::get('/', [PigController::class, 'index']);
+            Route::post('/', [PigController::class, 'store']);
+            Route::get('{id}', [PigController::class, 'show']);
+            Route::put('{id}', [PigController::class, 'update']);
+            Route::patch('{id}', [PigController::class, 'update']);
+            Route::delete('{id}', [PigController::class, 'destroy']);
+        });
+
+        Route::middleware('module.access:lots')->prefix('lot-animals')->group(function () {
+            Route::get('stats', [LotAnimalController::class, 'stats']);
+            Route::get('/', [LotAnimalController::class, 'index']);
+            Route::post('/', [LotAnimalController::class, 'store']);
+            Route::get('{id}', [LotAnimalController::class, 'show']);
+            Route::put('{id}', [LotAnimalController::class, 'update']);
+            Route::patch('{id}', [LotAnimalController::class, 'update']);
+            Route::delete('{id}', [LotAnimalController::class, 'destroy']);
         });
 
         // Actividades Module ('activities' / alias 'actividades')

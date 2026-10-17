@@ -1125,7 +1125,7 @@ class LotController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $query = $lot->animals();
+        $query = $lot->animals()->with(['services', 'lote']);
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
@@ -1135,11 +1135,20 @@ class LotController extends Controller
             $query->where('gender', $request->gender);
         }
 
+        if ($request->filled('sex')) {
+            $query->where('gender', $request->sex);
+        }
+
+        if ($request->filled('breed')) {
+            $query->where('breed', 'like', '%'.trim($request->breed).'%');
+        }
+
         if ($request->filled('search')) {
             $term = '%'.trim($request->search).'%';
             $query->where(function ($q) use ($term) {
                 $q->where('identifier', 'like', $term)
-                    ->orWhere('breed', 'like', $term);
+                    ->orWhere('breed', 'like', $term)
+                    ->orWhere('notes', 'like', $term);
             });
         }
 
@@ -1200,14 +1209,22 @@ class LotController extends Controller
             'breed' => 'nullable|string|max:255',
             'father_breed' => 'nullable|string|max:255',
             'mother_breed' => 'nullable|string|max:255',
-            'gender' => 'required|string|in:hembra,macho',
+            'gender' => 'required_without:sex|nullable|string|in:hembra,macho',
+            'sex' => 'nullable|string|in:hembra,macho',
             'birth_date' => 'nullable|date',
+            'entry_date' => 'nullable|date',
+            'weight' => 'nullable|numeric|min:0',
             'parity_count' => 'nullable|integer|min:0',
             'teats_count' => 'nullable|integer|min:0',
             'avg_piglets_per_birth' => 'nullable|numeric|min:0',
+            'accumulated_cost' => 'nullable|numeric|min:0',
+            'health_controls' => 'nullable|array',
+            'notes' => 'nullable|string|max:3000',
+            'observations' => 'nullable|string|max:3000',
         ], [
-            'gender.required' => 'El género del animal es obligatorio.',
+            'gender.required_without' => 'El género del animal es obligatorio.',
             'gender.in' => 'El género debe ser hembra o macho.',
+            'sex.in' => 'El sexo debe ser hembra o macho.',
         ]);
 
         if ($validator->fails()) {
@@ -1246,17 +1263,25 @@ class LotController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        $gender = $request->filled('gender') ? $request->input('gender') : $request->input('sex');
+        $notes = $request->filled('notes') ? $request->input('notes') : $request->input('observations');
+
         $animal = LoteAnimal::create([
             'lote_id' => $lot->id,
             'identifier' => $this->generateUniqueIdentifier(),
             'breed' => $request->filled('breed') ? trim((string) $request->breed) : null,
             'father_breed' => $request->filled('father_breed') ? trim((string) $request->father_breed) : null,
             'mother_breed' => $request->filled('mother_breed') ? trim((string) $request->mother_breed) : null,
-            'gender' => $request->gender,
+            'gender' => $gender,
             'birth_date' => $request->filled('birth_date') ? $request->input('birth_date') : null,
+            'entry_date' => $request->filled('entry_date') ? $request->input('entry_date') : now()->toDateString(),
+            'weight' => $request->filled('weight') ? round((float) $request->input('weight'), 2) : null,
             'parity_count' => (int) ($request->input('parity_count', 0)),
             'teats_count' => (int) ($request->input('teats_count', 0)),
             'avg_piglets_per_birth' => round((float) $request->input('avg_piglets_per_birth', 0), 2),
+            'accumulated_cost' => $request->filled('accumulated_cost') ? round((float) $request->input('accumulated_cost'), 2) : null,
+            'health_controls' => $request->input('health_controls', []),
+            'notes' => $notes ? trim((string) $notes) : null,
             'status' => LoteAnimal::STATUS_ACTIVE,
         ]);
 
@@ -1283,6 +1308,8 @@ class LotController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
+        $animal->load(['lote', 'services']);
+
         return response()->json([
             'status' => 'success',
             'data' => $animal,
@@ -1308,16 +1335,24 @@ class LotController extends Controller
             'father_breed' => 'nullable|string|max:255',
             'mother_breed' => 'nullable|string|max:255',
             'gender' => 'sometimes|required|string|in:hembra,macho',
+            'sex' => 'sometimes|nullable|string|in:hembra,macho',
             'birth_date' => 'nullable|date',
+            'entry_date' => 'nullable|date',
+            'weight' => 'nullable|numeric|min:0',
             'parity_count' => 'nullable|integer|min:0',
             'teats_count' => 'nullable|integer|min:0',
             'avg_piglets_per_birth' => 'nullable|numeric|min:0',
             'sale_weight' => 'nullable|numeric|min:0',
             'sale_price_per_kg' => 'nullable|numeric|min:0',
             'sale_total_price' => 'nullable|numeric|min:0',
+            'accumulated_cost' => 'nullable|numeric|min:0',
+            'health_controls' => 'nullable|array',
+            'notes' => 'nullable|string|max:3000',
+            'observations' => 'nullable|string|max:3000',
             'status' => 'sometimes|required|string|in:activo,gestación,destete,cosechado,vendido,descartado,muerto',
         ], [
             'gender.in' => 'El género debe ser hembra o macho.',
+            'sex.in' => 'El sexo debe ser hembra o macho.',
             'status.in' => 'El estado debe ser activo, gestación, destete, cosechado, vendido, descartado o muerto.',
         ]);
 
@@ -1340,9 +1375,17 @@ class LotController extends Controller
         }
         if ($request->filled('gender')) {
             $animal->gender = $request->gender;
+        } elseif ($request->filled('sex')) {
+            $animal->gender = $request->sex;
         }
         if ($request->filled('birth_date')) {
             $animal->birth_date = $request->input('birth_date');
+        }
+        if ($request->filled('entry_date')) {
+            $animal->entry_date = $request->input('entry_date');
+        }
+        if ($request->filled('weight')) {
+            $animal->weight = round((float) $request->weight, 2);
         }
         if ($request->filled('parity_count')) {
             $animal->parity_count = (int) $request->parity_count;
@@ -1352,6 +1395,17 @@ class LotController extends Controller
         }
         if ($request->filled('avg_piglets_per_birth')) {
             $animal->avg_piglets_per_birth = round((float) $request->avg_piglets_per_birth, 2);
+        }
+        if ($request->filled('accumulated_cost')) {
+            $animal->accumulated_cost = round((float) $request->accumulated_cost, 2);
+        }
+        if ($request->has('health_controls')) {
+            $animal->health_controls = $request->input('health_controls');
+        }
+        if ($request->filled('notes')) {
+            $animal->notes = trim((string) $request->notes);
+        } elseif ($request->filled('observations')) {
+            $animal->notes = trim((string) $request->observations);
         }
         if ($request->filled('sale_weight')) {
             $animal->sale_weight = round((float) $request->sale_weight, 2);

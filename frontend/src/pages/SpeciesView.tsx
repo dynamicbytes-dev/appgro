@@ -795,11 +795,13 @@ export const SpeciesView: React.FC = () => {
             size="sm"
             onClick={() => loadSpecies()}
             disabled={isLoading}
+            className="whitespace-nowrap"
             icon={<RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
           >
             Actualizar Lista
           </Button>
           <ExportKpiPdfButton
+            className="whitespace-nowrap"
             moduleTitle="Módulo de Especies Pecuarias"
             moduleSlug="especies"
             kpis={[
@@ -850,9 +852,10 @@ export const SpeciesView: React.FC = () => {
             variant="accent"
             size="sm"
             onClick={openCreateModal}
+            className="whitespace-nowrap"
             icon={<Plus className="w-4 h-4" />}
           >
-            + Nueva Especie
+            Nueva Especie
           </Button>
         </div>
       </div>
