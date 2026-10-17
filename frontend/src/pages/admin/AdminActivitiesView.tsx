@@ -327,7 +327,7 @@ export const AdminActivitiesView: React.FC = () => {
         title="Actividades"
         subtitle={`Crea tareas y asígnalas a tu personal. ${stats ? `${stats.total} en total.` : ''}`}
       >
-          <Button variant="outline" size="sm" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
+          <Button variant="outline" size="sm" onClick={() => void loadActivities()} icon={<RefreshCw className="w-3.5 h-3.5" />}>
             Actualizar
           </Button>
           <ExportKpiPdfButton
@@ -481,7 +481,7 @@ export const AdminActivitiesView: React.FC = () => {
                     className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors"
                   >
                     <td className="px-4 py-3 max-w-[280px]">
-                      <p className="font-semibold text-sm text-[#1E1E1E] dark:text-gray-100 truncate">
+                      <p className="font-semibold text-xs text-[#1E1E1E] dark:text-gray-100 truncate">
                         {safeText(activity.title, `Actividad #${activity.id}`)}
                       </p>
                       {activity.description && (
@@ -490,16 +490,16 @@ export const AdminActivitiesView: React.FC = () => {
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                    <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-200">
                       {safeText(fullName(activity.assignee), 'Sin asignar')}
                     </td>
                     {isRoot && (
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
+                      <td className="px-4 py-3 text-xs text-gray-700 dark:text-gray-200">
                         {safeText(activity.farm_name ?? activity.farm?.name ?? '—', '—')}
                       </td>
                     )}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-xs">
                         <span className="text-gray-700 dark:text-gray-200">{formatDate(activity.due_date)}</span>
                         {activity.is_overdue && activity.status !== 'terminada' && (
                           <Badge variant="danger" className="text-[10px]!">
@@ -520,7 +520,7 @@ export const AdminActivitiesView: React.FC = () => {
                             setSelectedActivity(activity);
                             setIsDetailModalOpen(true);
                           }}
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-[#1B4D3E] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                           title="Ver detalle"
                         >
                           <Eye className="w-4 h-4" />
@@ -530,7 +530,7 @@ export const AdminActivitiesView: React.FC = () => {
                           <>
                             <button
                               onClick={() => openEditModal(activity)}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
                               title="Editar actividad"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -541,7 +541,7 @@ export const AdminActivitiesView: React.FC = () => {
                                 setSelectedActivity(activity);
                                 setIsDeleteModalOpen(true);
                               }}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                              className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                               title="Eliminar actividad"
                             >
                               <Trash2 className="w-4 h-4" />

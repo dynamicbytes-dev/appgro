@@ -299,7 +299,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                 {(filtered || []).map((supplier) => (
                   <tr key={`supplier-${supplier.id}`} className="hover:bg-gray-50 dark:hover:bg-[#263632]/40 transition-colors">
                     <td className="px-4 py-3 max-w-[240px]">
-                      <p className="font-semibold text-sm text-[#1E1E1E] dark:text-gray-100 truncate">
+                      <p className="font-semibold text-xs text-[#1E1E1E] dark:text-gray-100 truncate">
                         {safeText(supplier.name, `Proveedor #${supplier.id}`)}
                       </p>
                       {supplier.tax_id ? (
@@ -336,7 +336,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                           <button
                             type="button"
                             onClick={() => openEditModal(supplier)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                            className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
                             title="Editar proveedor"
                           >
                             <Edit2 className="w-4 h-4" />
@@ -347,7 +347,7 @@ export const InventorySuppliersTab: React.FC<InventorySuppliersTabProps> = ({ is
                               setSelected(supplier);
                               setIsDeleteModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                            className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                             title="Eliminar proveedor"
                           >
                             <Trash2 className="w-4 h-4" />

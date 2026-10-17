@@ -642,7 +642,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({
                             </Badge>
                           ))}
                         </div>
-                        <p className="font-semibold text-sm text-[#1E1E1E] dark:text-gray-100 truncate mt-0.5">
+                        <p className="font-semibold text-xs text-[#1E1E1E] dark:text-gray-100 truncate mt-0.5">
                           {safeText(item.name, `Insumo #${item.id}`)}
                         </p>
                         {item.location ? (
@@ -655,7 +655,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="text-sm font-bold text-[#1E1E1E] dark:text-gray-100">
+                        <p className="text-xs font-bold text-[#1E1E1E] dark:text-gray-100">
                           {formatQtyWithUnit(item.current_stock, item.unit)}
                         </p>
                         <p className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -683,7 +683,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({
                               setSelectedItem(item);
                               setIsDetailModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#1B4D3E] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                            className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                             title="Ver detalle"
                           >
                             <Eye className="w-4 h-4" />
@@ -695,7 +695,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({
                               setSelectedItem(item);
                               setIsMovementModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-[#4E9F3D] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                            className="p-1.5 rounded-lg text-[#4E9F3D] hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
                             title="Registrar movimiento"
                           >
                             <PackagePlus className="w-4 h-4" />
@@ -706,7 +706,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({
                               <button
                                 type="button"
                                 onClick={() => openEditModal(item)}
-                                className="p-1.5 rounded-lg text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                                className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors"
                                 title="Editar insumo"
                               >
                                 <Edit2 className="w-4 h-4" />
@@ -718,7 +718,7 @@ export const InventoryItemsTab: React.FC<InventoryItemsTabProps> = ({
                                   setSelectedItem(item);
                                   setIsDeleteModalOpen(true);
                                 }}
-                                className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                                className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                 title="Eliminar insumo"
                               >
                                 <Trash2 className="w-4 h-4" />

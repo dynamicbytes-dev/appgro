@@ -1034,7 +1034,7 @@ export const ShedsView: React.FC = () => {
                               type="button"
                               onClick={() => openDetailModal(barn)}
                               title="Ver ficha técnica"
-                              className="p-1.5 text-gray-400 hover:text-[#1B4D3E] dark:hover:text-[#4E9F3D] hover:bg-gray-100 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -1044,7 +1044,7 @@ export const ShedsView: React.FC = () => {
                               type="button"
                               onClick={() => openEditModal(barn)}
                               title="Editar galpón"
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
@@ -1056,8 +1056,8 @@ export const ShedsView: React.FC = () => {
                               title={isActive ? 'Inhabilitar galpón' : 'Habilitar galpón'}
                               className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                 isActive
-                                  ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-[#263632]'
-                                  : 'text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-[#263632]'
+                                  ? 'text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                                  : 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
                               }`}
                             >
                               <Power className="w-4 h-4" />
@@ -1068,7 +1068,7 @@ export const ShedsView: React.FC = () => {
                               type="button"
                               onClick={() => openDeleteModal(barn)}
                               title="Eliminar galpón"
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>

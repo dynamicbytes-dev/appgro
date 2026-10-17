@@ -85,7 +85,7 @@ export const AnalyticsStaffTab: React.FC<AnalyticsStaffTabProps> = ({ farmId }) 
               : 'Cumplimiento, cargas de trabajo y tiempos de respuesta del personal.'}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void load()} icon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="sm" onClick={() => void load()} icon={<RefreshCw className="w-3.5 h-3.5" />}>
           Actualizar
         </Button>
       </div>
@@ -169,7 +169,7 @@ export const AnalyticsStaffTab: React.FC<AnalyticsStaffTabProps> = ({ farmId }) 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-gray-100 dark:border-[#263632] text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                <tr className="border-b border-gray-100 dark:border-[#263632] text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   <th className="py-2.5 pr-3">Subordinado</th>
                   <th className="py-2.5 px-3 text-center">Total</th>
                   <th className="py-2.5 px-3 text-center">Term.</th>

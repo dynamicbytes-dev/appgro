@@ -144,7 +144,7 @@ export const MyActivitiesView: React.FC = () => {
         title="Mis Actividades"
         subtitle={`Tareas asignadas por el administrador. ${stats ? `${stats.total} en total.` : ''}`}
       >
-        <Button variant="outline" size="sm" onClick={() => void loadActivities()} icon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="sm" onClick={() => void loadActivities()} icon={<RefreshCw className="w-3.5 h-3.5" />}>
           Actualizar
         </Button>
       </PageHeader>

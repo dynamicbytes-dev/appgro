@@ -199,7 +199,7 @@ export const InventoryPanelTab: React.FC<InventoryPanelTabProps> = ({
             return isRoot ? [item.farm?.name || item.farm_name || 'Granja', ...baseRow] : baseRow;
           })}
         />
-        <Button variant="outline" size="sm" onClick={() => void loadPanel()} icon={<RefreshCw className="w-4 h-4" />}>
+        <Button variant="outline" size="sm" onClick={() => void loadPanel()} icon={<RefreshCw className="w-3.5 h-3.5" />}>
           Actualizar
         </Button>
       </div>

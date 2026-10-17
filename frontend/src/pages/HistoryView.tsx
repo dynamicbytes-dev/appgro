@@ -460,6 +460,15 @@ export const HistoryView: React.FC = () => {
         title={safeText(headerTitle)}
         subtitle={safeText(headerSubtitle)}
       >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchLogs(currentPage, true)}
+            disabled={isRefreshing || isLoading}
+            icon={<RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />}
+          >
+            Actualizar
+          </Button>
           <ExportKpiPdfButton
             moduleTitle="Historial de Actividades y Auditoría"
             moduleSlug="historial_actividades"
@@ -475,15 +484,6 @@ export const HistoryView: React.FC = () => {
             columns={historyColumns}
             rows={historyRows}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchLogs(currentPage, true)}
-            disabled={isRefreshing || isLoading}
-            icon={<RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />}
-          >
-            Actualizar
-          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -827,7 +827,7 @@ export const HistoryView: React.FC = () => {
                               setIsModalOpen(true);
                             }}
                             title="Ver detalle del registro"
-                            className="p-1.5 text-gray-400 hover:text-[#1B4D3E] dark:hover:text-[#4E9F3D] hover:bg-gray-100 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                            className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                           >
                             <Eye className="w-4 h-4" />
                           </button>

@@ -2151,7 +2151,7 @@ export const LotesView: React.FC = () => {
                                   ? 'Ficha técnica — animales del lote'
                                   : 'Ver ficha técnica'
                               }
-                              className="p-1.5 text-gray-400 hover:text-[#1B4D3E] dark:hover:text-[#4E9F3D] hover:bg-gray-100 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                             >
                               <Eye className="w-4 h-4" />
                             </button>
@@ -2161,7 +2161,7 @@ export const LotesView: React.FC = () => {
                               type="button"
                               onClick={() => openEditModal(lot)}
                               title="Editar lote"
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
@@ -2173,7 +2173,7 @@ export const LotesView: React.FC = () => {
                                 type="button"
                                 onClick={() => openHarvestModal(lot)}
                                 title="Cosechar lote"
-                                className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
                               >
                                 <PackageCheck className="w-4 h-4" />
                               </button>
@@ -2186,7 +2186,7 @@ export const LotesView: React.FC = () => {
                                 type="button"
                                 onClick={() => openEggsModal(lot)}
                                 title="Recoger huevos"
-                                className="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-yellow-600 hover:bg-yellow-50 dark:hover:bg-yellow-950/40 transition-colors cursor-pointer"
                               >
                                 <Egg className="w-4 h-4" />
                               </button>
@@ -2198,7 +2198,7 @@ export const LotesView: React.FC = () => {
                                 type="button"
                                 onClick={() => openAnimalsModal(lot)}
                                 title="Animales individuales del lote"
-                                className="p-1.5 text-gray-400 hover:text-pink-600 hover:bg-pink-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-950/40 transition-colors cursor-pointer"
                               >
                                 <PiggyBank className="w-4 h-4" />
                               </button>
@@ -2209,7 +2209,7 @@ export const LotesView: React.FC = () => {
                               type="button"
                               onClick={() => openDeleteModal(lot)}
                               title="Eliminar lote"
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -3473,7 +3473,7 @@ export const LotesView: React.FC = () => {
                                     type="button"
                                     onClick={() => openMortalityModal(animal)}
                                     title="Registrar mortalidad"
-                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                                   >
                                     <Skull className="w-4 h-4" />
                                   </button>
@@ -3483,7 +3483,7 @@ export const LotesView: React.FC = () => {
                                   type="button"
                                   onClick={() => openAnimalEditModal(animal)}
                                   title="Editar animal"
-                                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
                                 >
                                   <Edit2 className="w-4 h-4" />
                                 </button>
@@ -3493,7 +3493,7 @@ export const LotesView: React.FC = () => {
                                     type="button"
                                     onClick={() => openAnimalSaleModal(animal)}
                                     title="Cosecha / Venta individual"
-                                    className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer"
                                   >
                                     <DollarSign className="w-4 h-4" />
                                   </button>
@@ -3539,7 +3539,7 @@ export const LotesView: React.FC = () => {
                                   type="button"
                                   onClick={() => openServiceHistory(animal)}
                                   title="Historial de servicios"
-                                  className="p-1.5 text-gray-400 hover:text-[#1B4D3E] dark:hover:text-[#4E9F3D] hover:bg-gray-100 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer"
+                                  className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                                 >
                                   <History className="w-4 h-4" />
                                 </button>

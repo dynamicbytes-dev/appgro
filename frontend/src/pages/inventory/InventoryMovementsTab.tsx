@@ -252,7 +252,7 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({
                         <span className="font-mono text-[11px] font-bold text-[#1B4D3E] dark:text-[#6DBF5C]">
                           {safeText(movement.item_code ?? movement.item?.code ?? '', '')}
                         </span>
-                        <p className="text-sm text-gray-700 dark:text-gray-200 truncate">
+                        <p className="text-xs text-gray-700 dark:text-gray-200 truncate">
                           {safeText(movement.item_name ?? movement.item?.name ?? '', '—')}
                         </p>
                       </td>
@@ -266,7 +266,7 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`text-sm font-bold ${
+                          className={`text-xs font-bold ${
                             movement.type === 'entrada'
                               ? 'text-[#4E9F3D]'
                               : movement.type === 'salida'
@@ -277,7 +277,7 @@ export const InventoryMovementsTab: React.FC<InventoryMovementsTabProps> = ({
                           {signedQty(movement)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-[#1E1E1E] dark:text-gray-100">
+                      <td className="px-4 py-3 text-xs font-semibold text-[#1E1E1E] dark:text-gray-100">
                         {formatQtyWithUnit(movement.resulting_stock, movement.unit ?? movement.item?.unit)}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
