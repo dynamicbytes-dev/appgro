@@ -52,6 +52,7 @@ class ResetFarmDataCommand extends Command
         'lots',
         'galpones',
         'barns',
+        'potreros',
         'species',
         'activities',
         'inventory_movements',

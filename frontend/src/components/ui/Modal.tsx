@@ -10,7 +10,7 @@ interface ModalProps {
   title: any;
   subtitle?: any;
   children: ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
   destroyOnClose?: boolean;
   /** Elevación del overlay (por defecto 50). Permite apilar modales
    *  de forma determinista sin depender del orden de los portales. */
@@ -111,6 +111,8 @@ export const Modal: React.FC<ModalProps> = ({
     lg: 'max-w-lg',
     xl: 'max-w-xl',
     '2xl': 'max-w-2xl',
+    '3xl': 'max-w-3xl',
+    '4xl': 'max-w-4xl',
   };
 
   const modalContent = (
@@ -127,13 +129,13 @@ export const Modal: React.FC<ModalProps> = ({
       }}
     >
       <div
-        className={`bg-white dark:bg-[#18221F] rounded-2xl border border-gray-200 dark:border-[#263632] shadow-2xl w-full ${widthClasses[maxWidth]} overflow-hidden transform transition-all duration-200 my-8 ${
+        className={`bg-white dark:bg-[#18221F] rounded-2xl border border-gray-200 dark:border-[#263632] shadow-2xl w-full ${widthClasses[maxWidth]} flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-3rem)] overflow-hidden transform transition-all duration-200 ${
           visible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-[#1B4D3E] text-white px-6 py-4 flex items-center justify-between">
+        <div className="shrink-0 bg-[#1B4D3E] text-white px-6 py-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold tracking-tight text-white">{safeText(title)}</h3>
             {subtitle && <p className="text-xs text-emerald-200 mt-0.5">{safeText(subtitle)}</p>}
@@ -149,7 +151,7 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto min-h-0">{children}</div>
       </div>
     </div>
   );

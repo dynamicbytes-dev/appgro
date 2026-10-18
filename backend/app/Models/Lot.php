@@ -38,6 +38,7 @@ class Lot extends Model
     protected $fillable = [
         'farm_id',
         'galpon_id',
+        'potrero_id',
         'barn_id',
         'code',
         'species_id',
@@ -66,6 +67,7 @@ class Lot extends Model
     protected $casts = [
         'farm_id' => 'integer',
         'galpon_id' => 'integer',
+        'potrero_id' => 'integer',
         'barn_id' => 'integer',
         'species_id' => 'integer',
         'quantity' => 'integer',
@@ -113,6 +115,11 @@ class Lot extends Model
     public function galpon()
     {
         return $this->belongsTo(Galpon::class, 'galpon_id');
+    }
+
+    public function potrero()
+    {
+        return $this->belongsTo(Potrero::class, 'potrero_id');
     }
 
     public function barn()
@@ -163,6 +170,17 @@ class Lot extends Model
     {
         return (int) static::query()
             ->where('galpon_id', $galponId)
+            ->where('status', self::STATUS_ACTIVE)
+            ->sum('quantity');
+    }
+
+    /**
+     * Cupo ocupado por los lotes activos de un potrero.
+     */
+    public static function occupiedCapacityForPotrero(int $potreroId): int
+    {
+        return (int) static::query()
+            ->where('potrero_id', $potreroId)
             ->where('status', self::STATUS_ACTIVE)
             ->sum('quantity');
     }

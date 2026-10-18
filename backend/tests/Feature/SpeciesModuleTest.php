@@ -6,6 +6,7 @@ use App\Models\Farm;
 use App\Models\FarmModule;
 use App\Models\Galpon;
 use App\Models\Module;
+use App\Models\Potrero;
 use App\Models\Species;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -496,7 +497,7 @@ class SpeciesModuleTest extends TestCase
         $this->assertEquals('caprina', $updateOk->json('data.category'));
     }
 
-    public function test_species_must_match_official_sector_taxonomy(): void
+    public function test_species_name_rejects_other_sector_official_names_and_allows_custom_variants(): void
     {
         $this->artisan('app:init-root');
 
@@ -527,11 +528,13 @@ class SpeciesModuleTest extends TestCase
         $tax = $this->withHeaders($auth)->getJson('/api/v1/species/taxonomy')->assertStatus(200);
         $this->assertCount(6, $tax->json('data'));
 
-        // Species outside the official list is rejected
+        // A custom name outside the official list is accepted as a variant
+        // of the selected sector (e.g. "Caballo" under bovina).
         $this->withHeaders($auth)
             ->postJson('/api/v1/species', ['name' => 'Caballo', 'category' => 'bovina'])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['name']);
+            ->assertStatus(201)
+            ->assertJsonPath('data.name', 'Caballo')
+            ->assertJsonPath('data.category', 'bovina');
 
         // Species from another sector is rejected (pollo is not bovino)
         $this->withHeaders($auth)
@@ -876,6 +879,67 @@ class SpeciesModuleTest extends TestCase
         // Species and its galpón remain intact
         $this->assertDatabaseHas('species', ['id' => $species->id]);
         $this->assertDatabaseHas('galpones', ['species_id' => $species->id]);
+    }
+
+    public function test_cannot_delete_species_being_used_by_potreros(): void
+    {
+        $this->artisan('app:init-root');
+
+        $farm = Farm::create([
+            'name' => 'Granja Especie en Uso Potrero',
+            'sector' => 'bovina',
+            'is_active' => true,
+        ]);
+
+        $speciesMod = Module::where('code', 'species')->first();
+        $potreroMod = Module::where('code', 'potreros')->first();
+        FarmModule::where('farm_id', $farm->id)
+            ->whereIn('module_id', [$speciesMod->id, $potreroMod->id])
+            ->update(['is_enabled' => true]);
+
+        User::create([
+            'farm_id' => $farm->id,
+            'name' => 'Admin Especie en Potrero',
+            'email' => 'admin_spec_potrero@test.com',
+            'password_hash' => Hash::make('password123'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $token = $this->postJson('/api/v1/auth/login', [
+            'email' => 'admin_spec_potrero@test.com',
+            'password' => 'password123',
+        ])->json('data.access_token');
+
+        $species = Species::create([
+            'farm_id' => $farm->id,
+            'name' => 'Vaca Potrero',
+            'category' => 'bovina',
+            'is_active' => true,
+        ]);
+
+        Potrero::create([
+            'farm_id' => $farm->id,
+            'species_id' => $species->id,
+            'name' => 'Potrero 1 - Pastoreo',
+            'category' => 'bovina',
+            'sector' => 'bovina',
+            'purpose' => 'carne',
+            'max_capacity' => 80,
+            'is_active' => true,
+        ]);
+
+        $res = $this->withHeader('Authorization', 'Bearer ' . $token)
+            ->deleteJson("/api/v1/species/{$species->id}");
+
+        $res->assertStatus(422)
+            ->assertJsonFragment([
+                'status' => 'error',
+                'message' => 'No se puede eliminar la especie porque está siendo utilizada en potreros activos.',
+            ]);
+
+        $this->assertDatabaseHas('species', ['id' => $species->id]);
+        $this->assertDatabaseHas('potreros', ['species_id' => $species->id]);
     }
 
     public function test_can_delete_species_without_galpones_associated(): void

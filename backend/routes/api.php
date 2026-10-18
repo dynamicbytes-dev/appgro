@@ -9,6 +9,7 @@ use App\Http\Controllers\AppConfigController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BarnController;
 use App\Http\Controllers\GalponController;
+use App\Http\Controllers\PotreroController;
 use App\Http\Controllers\HistoryController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\InventoryLotController;
@@ -17,6 +18,8 @@ use App\Http\Controllers\InventorySupplierController;
 use App\Http\Controllers\InventoryWarehouseController;
 use App\Http\Controllers\LotController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PastureBiomassSurveyController;
+use App\Http\Controllers\PastureTreatmentController;
 use App\Http\Controllers\Root\RootAdminController;
 use App\Http\Controllers\Root\RootDashboardController;
 use App\Http\Controllers\Root\RootFarmController;
@@ -115,6 +118,17 @@ $registerRoutes = function () {
         Route::put('barns/{id}', [BarnController::class, 'update']);
         Route::patch('barns/{id}/status', [BarnController::class, 'toggleStatus']);
         Route::delete('barns/{id}', [BarnController::class, 'destroy']);
+
+        // Potreros Root Management
+        Route::get('potreros/stats', [PotreroController::class, 'stats']);
+        Route::get('potreros/summary', [PotreroController::class, 'stats']);
+        Route::get('potreros/geojson', [PotreroController::class, 'geojson']);
+        Route::get('potreros', [PotreroController::class, 'index']);
+        Route::post('potreros', [PotreroController::class, 'store']);
+        Route::get('potreros/{id}', [PotreroController::class, 'show']);
+        Route::put('potreros/{id}', [PotreroController::class, 'update']);
+        Route::patch('potreros/{id}/status', [PotreroController::class, 'toggleStatus']);
+        Route::delete('potreros/{id}', [PotreroController::class, 'destroy']);
     });
 
     // Operational routes protected by JWT + Module Access Middleware
@@ -214,6 +228,38 @@ $registerRoutes = function () {
         Route::middleware('module.access:barns')->get('admin/barns/stats', [BarnController::class, 'stats']);
         Route::middleware('module.access:barns')->get('admin/barns/summary', [BarnController::class, 'stats']);
         Route::middleware('module.access:barns')->get('admin/barns', [BarnController::class, 'index']);
+
+        // Potreros Module ('potreros')
+        Route::middleware('module.access:potreros')->prefix('potreros')->group(function () {
+            Route::get('stats', [PotreroController::class, 'stats']);
+            Route::get('summary', [PotreroController::class, 'stats']);
+            Route::get('geojson', [PotreroController::class, 'geojson']);
+            Route::get('/', [PotreroController::class, 'index']);
+            Route::post('/', [PotreroController::class, 'store']);
+
+            // Fase 2: manejo agronómico (tratamientos y aforo de forraje).
+            Route::get('{potrero}/management', [PotreroController::class, 'management']);
+            Route::get('{potrero}/treatments', [PastureTreatmentController::class, 'index']);
+            Route::post('{potrero}/treatments', [PastureTreatmentController::class, 'store']);
+            Route::put('{potrero}/treatments/{treatment}', [PastureTreatmentController::class, 'update']);
+            Route::patch('{potrero}/treatments/{treatment}', [PastureTreatmentController::class, 'update']);
+            Route::delete('{potrero}/treatments/{treatment}', [PastureTreatmentController::class, 'destroy']);
+            Route::get('{potrero}/biomass-surveys', [PastureBiomassSurveyController::class, 'index']);
+            Route::post('{potrero}/biomass-surveys', [PastureBiomassSurveyController::class, 'store']);
+            Route::put('{potrero}/biomass-surveys/{survey}', [PastureBiomassSurveyController::class, 'update']);
+            Route::patch('{potrero}/biomass-surveys/{survey}', [PastureBiomassSurveyController::class, 'update']);
+            Route::delete('{potrero}/biomass-surveys/{survey}', [PastureBiomassSurveyController::class, 'destroy']);
+
+            Route::get('{id}', [PotreroController::class, 'show']);
+            Route::put('{id}', [PotreroController::class, 'update']);
+            Route::patch('{id}', [PotreroController::class, 'update']);
+            Route::patch('{id}/status', [PotreroController::class, 'toggleStatus']);
+            Route::patch('{id}/toggle-status', [PotreroController::class, 'toggleStatus']);
+            Route::delete('{id}', [PotreroController::class, 'destroy']);
+        });
+        Route::middleware('module.access:potreros')->get('admin/potreros/stats', [PotreroController::class, 'stats']);
+        Route::middleware('module.access:potreros')->get('admin/potreros/summary', [PotreroController::class, 'stats']);
+        Route::middleware('module.access:potreros')->get('admin/potreros', [PotreroController::class, 'index']);
 
         // Lotes Module ('lots' / alias 'lotes')
         Route::middleware('module.access:lots')->prefix('lots')->group(function () {

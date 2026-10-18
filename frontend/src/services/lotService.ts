@@ -33,6 +33,7 @@ export interface LotFilterParams {
   search?: string;
   status?: string;
   galpon_id?: number | string;
+  potrero_id?: number | string;
   species_id?: number | string;
   purpose?: string;
   farm_id?: number | string;
@@ -57,6 +58,7 @@ export const lotService = {
     if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
     if (params.status && params.status !== 'all') cleanParams.status = params.status;
     if (params.galpon_id && params.galpon_id !== 'all') cleanParams.galpon_id = params.galpon_id;
+    if (params.potrero_id && params.potrero_id !== 'all') cleanParams.potrero_id = params.potrero_id;
     if (params.species_id && params.species_id !== 'all') cleanParams.species_id = params.species_id;
     if (params.purpose && params.purpose !== 'all') cleanParams.purpose = params.purpose;
 

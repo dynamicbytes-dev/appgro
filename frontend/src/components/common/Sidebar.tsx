@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Boxes,
   Warehouse,
+  Fence,
   Layers,
   ClipboardList,
   Package,
@@ -23,6 +24,7 @@ import {
 const MODULE_ICONS: Record<string, React.ReactNode> = {
   especies: <Layers className="w-4 h-4 text-[#4E9F3D]" />,
   galpones: <Warehouse className="w-4 h-4 text-[#4E9F3D]" />,
+  potreros: <Fence className="w-4 h-4 text-[#4E9F3D]" />,
   lotes: <Boxes className="w-4 h-4 text-[#4E9F3D]" />,
   actividades: <ClipboardList className="w-4 h-4 text-[#4E9F3D]" />,
   inventario: <Package className="w-4 h-4 text-[#4E9F3D]" />,

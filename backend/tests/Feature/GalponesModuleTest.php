@@ -106,7 +106,7 @@ class GalponesModuleTest extends TestCase
 
         $farm = Farm::create([
             'name' => 'Granja Con Galpones',
-            'sector' => 'bovino',
+            'sector' => 'porcino',
             'is_active' => true,
         ]);
 
@@ -127,8 +127,8 @@ class GalponesModuleTest extends TestCase
         // Create an active species for this farm
         $species = Species::create([
             'farm_id' => $farm->id,
-            'name' => 'Bovino Angus',
-            'category' => 'bovina',
+            'name' => 'Porcino Landrace',
+            'category' => 'porcina',
             'is_active' => true,
         ]);
 
@@ -155,8 +155,8 @@ class GalponesModuleTest extends TestCase
                 'species_id' => $species->id,
                 'farm_id' => $farm->id,
                 'purpose' => 'carne',
-                'category' => 'bovina',
-                'sector' => 'bovina',
+                'category' => 'porcina',
+                'sector' => 'porcina',
                 'max_capacity' => 120,
                 'is_active' => true,
             ],
@@ -168,7 +168,7 @@ class GalponesModuleTest extends TestCase
             'name' => 'Galpón 1 - Engorde Intensivo',
             'farm_id' => $farm->id,
             'species_id' => $species->id,
-            'sector' => 'bovina',
+            'sector' => 'porcina',
             'max_capacity' => 120,
         ]);
 
@@ -195,6 +195,193 @@ class GalponesModuleTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['purpose']);
+    }
+
+    public function test_admin_can_create_cunicola_galpon_with_its_valid_purposes(): void
+    {
+        $this->artisan('app:init-root');
+
+        $farm = Farm::create([
+            'name' => 'Granja Cunícola',
+            'sector' => 'cunícola',
+            'is_active' => true,
+        ]);
+
+        $galponMod = Module::where('code', 'barns')->first();
+        FarmModule::where('farm_id', $farm->id)
+            ->where('module_id', $galponMod->id)
+            ->update(['is_enabled' => true]);
+
+        User::create([
+            'farm_id' => $farm->id,
+            'name' => 'Admin Cunícola',
+            'email' => 'admin_cunicola_galpon@test.com',
+            'password_hash' => Hash::make('password123'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $species = Species::create([
+            'farm_id' => $farm->id,
+            'name' => 'Conejo',
+            'category' => 'cunícola',
+            'is_active' => true,
+        ]);
+
+        $token = $this->postJson('/api/v1/auth/login', [
+            'email' => 'admin_cunicola_galpon@test.com',
+            'password' => 'password123',
+        ])->json('data.access_token');
+
+        // Los propósitos válidos del sector Cunícola (Carne y Reproducción) deben aceptarse.
+        foreach (['Carne', 'Reproducción'] as $purpose) {
+            $this->withHeader('Authorization', 'Bearer '.$token)
+                ->postJson('/api/v1/galpones', [
+                    'name' => 'Galpón '.$purpose,
+                    'species_id' => $species->id,
+                    'purpose' => $purpose,
+                    'max_capacity' => 50,
+                    'is_active' => true,
+                ])
+                ->assertStatus(201)
+                ->assertJson([
+                    'status' => 'success',
+                    'data' => [
+                        'purpose' => $purpose,
+                        'category' => 'cunícola',
+                        'sector' => 'cunícola',
+                    ],
+                ]);
+        }
+
+        // Huevos solo aplica al sector Avícola.
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/galpones', [
+                'name' => 'Galpón con propósito inválido',
+                'species_id' => $species->id,
+                'purpose' => 'huevos',
+                'max_capacity' => 50,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['purpose']);
+    }
+
+    public function test_cannot_create_galpon_with_species_outside_allowed_sectors(): void
+    {
+        $this->artisan('app:init-root');
+
+        $farm = Farm::create([
+            'name' => 'Granja Sectores No Permitidos',
+            'sector' => 'bovino',
+            'is_active' => true,
+        ]);
+
+        $galponMod = Module::where('code', 'barns')->first();
+        FarmModule::where('farm_id', $farm->id)
+            ->where('module_id', $galponMod->id)
+            ->update(['is_enabled' => true]);
+
+        $admin = User::create([
+            'farm_id' => $farm->id,
+            'name' => 'Admin Sectores',
+            'email' => 'admin_sectores@test.com',
+            'password_hash' => Hash::make('password123'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        // Bovino no está permitido en Galpones (se gestionará en el módulo Potreros)
+        $species = Species::create([
+            'farm_id' => $farm->id,
+            'name' => 'Bovino Angus',
+            'category' => 'bovina',
+            'is_active' => true,
+        ]);
+
+        $login = $this->postJson('/api/v1/auth/login', [
+            'email' => 'admin_sectores@test.com',
+            'password' => 'password123',
+        ]);
+        $token = $login->json('data.access_token');
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/galpones', [
+                'name' => 'Galpón Bovino No Permitido',
+                'species_id' => $species->id,
+                'purpose' => 'carne',
+                'max_capacity' => 100,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath(
+                'errors.species_id.0',
+                'El módulo de Galpones solo admite especies de los sectores Avícola, Porcino y Cunícola. Las demás se gestionarán en el módulo Potreros.'
+            );
+    }
+
+    public function test_update_allows_keeping_legacy_non_allowed_species(): void
+    {
+        $this->artisan('app:init-root');
+
+        $farm = Farm::create([
+            'name' => 'Granja Legado Bovino',
+            'sector' => 'bovino',
+            'is_active' => true,
+        ]);
+
+        $galponMod = Module::where('code', 'barns')->first();
+        FarmModule::where('farm_id', $farm->id)
+            ->where('module_id', $galponMod->id)
+            ->update(['is_enabled' => true]);
+
+        $admin = User::create([
+            'farm_id' => $farm->id,
+            'name' => 'Admin Legado',
+            'email' => 'admin_legado@test.com',
+            'password_hash' => Hash::make('password123'),
+            'role' => 'admin',
+            'is_active' => true,
+        ]);
+
+        $species = Species::create([
+            'farm_id' => $farm->id,
+            'name' => 'Bovino Legado',
+            'category' => 'bovina',
+            'is_active' => true,
+        ]);
+
+        // Galpón heredado (creado antes de la restricción de sectores)
+        $galpon = Galpon::create([
+            'farm_id' => $farm->id,
+            'species_id' => $species->id,
+            'name' => 'Galpón Heredado',
+            'category' => 'bovina',
+            'sector' => 'bovina',
+            'purpose' => 'Carne',
+            'max_capacity' => 30,
+            'is_active' => true,
+        ]);
+
+        $login = $this->postJson('/api/v1/auth/login', [
+            'email' => 'admin_legado@test.com',
+            'password' => 'password123',
+        ]);
+        $token = $login->json('data.access_token');
+
+        // Editar solo el nombre no debe bloquearse por el sector heredado
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/v1/galpones/'.$galpon->id, [
+                'name' => 'Galpón Heredado Editado',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.name', 'Galpón Heredado Editado');
+
+        // Mantener la misma especie heredada tampoco debe bloquearse
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson('/api/v1/galpones/'.$galpon->id, [
+                'species_id' => $species->id,
+                'name' => 'Galpón Heredado Editado 2',
+            ])
+            ->assertStatus(200);
     }
 
     public function test_validates_species_id_must_belong_to_same_farm(): void

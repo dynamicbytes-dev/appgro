@@ -7,6 +7,7 @@ use App\Models\EggProduction;
 use App\Models\Galpon;
 use App\Models\Lot;
 use App\Models\LoteAnimal;
+use App\Models\Potrero;
 use App\Models\Species;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -77,9 +78,91 @@ class LotController extends Controller
     {
         return Lot::with([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
-            'species:id,name,category,is_active',
+            'potrero:id,farm_id,name,sector,purpose,max_capacity,is_active',
+            'species:id,name,category,is_active,is_custom',
             'farm:id,name,code',
         ])->find($id);
+    }
+
+    /**
+     * Vocabulario del proceso reproductivo según la especie del lote.
+     * La cría y la hembra se nombran con los términos propios de la
+     * especie (cerda/lechón en porcino, coneja/gazapo en cunícola).
+     *
+     * @return array{female: string, offspring: string}
+     */
+    private function reproductionTerms(?string $category): array
+    {
+        $key = Species::normalizeKey((string) $category);
+
+        if (str_starts_with($key, 'cunic')) {
+            return ['female' => 'coneja', 'offspring' => 'gazapos'];
+        }
+
+        return ['female' => 'cerda', 'offspring' => 'lechones'];
+    }
+
+    /**
+     * ¿La especie pertenece a un sector gestionado por Potreros
+     * (Bovino, Ovino o Caprino)?
+     */
+    private function isPotreroSpecies(Species $species): bool
+    {
+        return in_array(
+            Species::canonicalCategory($species->category),
+            PotreroController::ALLOWED_POTRERO_CATEGORIES,
+            true
+        );
+    }
+
+    /**
+     * Contexto de cupo del destino del lote (potrero o galpón).
+     *
+     * @return array{label: string, capacity: int, occupied: int}|null
+     */
+    private function destinationCapacity(Lot $lot, bool $excludeThisLot = true): ?array
+    {
+        if ($lot->potrero_id) {
+            $potrero = Potrero::find($lot->potrero_id);
+
+            if (! $potrero) {
+                return null;
+            }
+
+            $occupied = (int) Lot::query()
+                ->where('potrero_id', $potrero->id)
+                ->where('status', Lot::STATUS_ACTIVE)
+                ->when($excludeThisLot, fn ($q) => $q->where('id', '!=', $lot->id))
+                ->sum('quantity');
+
+            return [
+                'label' => 'potrero',
+                'capacity' => (int) $potrero->max_capacity,
+                'occupied' => $occupied,
+            ];
+        }
+
+        if ($lot->galpon_id) {
+            $galpon = Galpon::find($lot->galpon_id);
+
+            if (! $galpon) {
+                return null;
+            }
+
+            $occupied = (int) Lot::query()
+                ->where('galpon_id', $galpon->id)
+                ->where('status', Lot::STATUS_ACTIVE)
+                ->when($excludeThisLot, fn ($q) => $q->where('id', '!=', $lot->id))
+                ->sum('quantity');
+
+            return [
+                'label' => 'galpón',
+                'capacity' => (int) $galpon->max_capacity,
+                'occupied' => $occupied,
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -133,24 +216,20 @@ class LotController extends Controller
             return;
         }
 
-        // Reingreso a producción: revalidar cupo disponible del galpón
-        // (también al reactivar un lote inactivo por cierre automático,
-        // ya que volverá a consumir cupo al pasar a activo).
-        if ($lot->galpon_id) {
-            $galpon = Galpon::find($lot->galpon_id);
+        // Reingreso a producción: revalidar cupo disponible del destino
+        // (potrero o galpón; también al reactivar un lote inactivo por
+        // cierre automático, ya que volverá a consumir cupo al pasar a
+        // activo).
+        $context = $this->destinationCapacity($lot, true);
 
-            if ($galpon) {
-                $occupiedExcludingThisLot = (int) Lot::query()
-                    ->where('galpon_id', $lot->galpon_id)
-                    ->where('status', Lot::STATUS_ACTIVE)
-                    ->where('id', '!=', $lot->id)
-                    ->sum('quantity');
+        if ($context !== null) {
+            $available = $context['capacity'] - $context['occupied'];
 
-                $available = (int) $galpon->max_capacity - $occupiedExcludingThisLot;
-
-                if ($available < ((int) $lot->quantity + 1)) {
-                    abort(Response::HTTP_UNPROCESSABLE_ENTITY, 'El galpón no tiene cupo disponible para reincorporar el animal a la producción.');
-                }
+            if ($available < ((int) $lot->quantity + 1)) {
+                abort(Response::HTTP_UNPROCESSABLE_ENTITY, sprintf(
+                    'El %s no tiene cupo disponible para reincorporar el animal a la producción.',
+                    $context['label']
+                ));
             }
         }
 
@@ -175,7 +254,8 @@ class LotController extends Controller
 
         $query = Lot::query()->with([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
-            'species:id,name,category,is_active',
+            'potrero:id,farm_id,name,sector,purpose,max_capacity,is_active',
+            'species:id,name,category,is_active,is_custom',
             'farm:id,name,code',
         ]);
 
@@ -205,6 +285,10 @@ class LotController extends Controller
 
         if ($request->filled('galpon_id')) {
             $query->where('galpon_id', (int) $request->galpon_id);
+        }
+
+        if ($request->filled('potrero_id')) {
+            $query->where('potrero_id', (int) $request->potrero_id);
         }
 
         if ($request->filled('species_id')) {
@@ -373,7 +457,8 @@ class LotController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'galpon_id' => 'required|integer|exists:galpones,id',
+            'galpon_id' => 'nullable|integer|exists:galpones,id',
+            'potrero_id' => 'nullable|integer|exists:potreros,id',
             'species_id' => 'required|integer|exists:species,id',
             'quantity' => 'required|integer|min:1',
             'purpose' => 'nullable|string|max:255',
@@ -384,8 +469,8 @@ class LotController extends Controller
             'from_service_ids' => 'nullable|array',
             'from_service_ids.*' => 'integer|exists:animal_services,id',
         ], [
-            'galpon_id.required' => 'El galpón destino es obligatorio.',
             'galpon_id.exists' => 'El galpón seleccionado no existe en el sistema.',
+            'potrero_id.exists' => 'El potrero seleccionado no existe en el sistema.',
             'species_id.required' => 'La especie asociada es obligatoria.',
             'species_id.exists' => 'La especie seleccionada no existe en el sistema.',
             'quantity.required' => 'La cantidad de animales es obligatoria.',
@@ -422,30 +507,7 @@ class LotController extends Controller
             $farmId = (int) $user->farm_id;
         }
 
-        // Galpon: must belong to the same farm and be active
-        $galpon = Galpon::find($request->galpon_id);
-
-        if (! $galpon || (int) $galpon->farm_id !== $farmId) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'El galpón seleccionado no pertenece a esta granja.',
-                'errors' => [
-                    'galpon_id' => ['El galpón seleccionado no pertenece a esta granja.'],
-                ],
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        if (! $galpon->is_active) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'El galpón seleccionado se encuentra inactivo.',
-                'errors' => [
-                    'galpon_id' => ['El galpón seleccionado se encuentra inactivo.'],
-                ],
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        // Species: same farm, active and matching the barn's species
+        // Especie: misma granja y activa
         $species = Species::find($request->species_id);
 
         if (! $species || (int) $species->farm_id !== $farmId) {
@@ -468,30 +530,125 @@ class LotController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        if ((int) $species->id !== (int) $galpon->species_id) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'La especie no coincide con la especie asignada al galpón.',
-                'errors' => [
-                    'species_id' => ['La especie no coincide con la especie asignada al galpón.'],
-                ],
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        // El destino depende del sector de la especie: Bovino/Ovino/Caprino
+        // se alojan en un Potrero; el resto en un Galpón.
+        if ($this->isPotreroSpecies($species)) {
+            if (! $request->filled('potrero_id')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El potrero destino es obligatorio para esta especie.',
+                    'errors' => [
+                        'potrero_id' => ['El potrero destino es obligatorio para las especies Bovino, Ovino y Caprino.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $potrero = Potrero::find($request->potrero_id);
+
+            if (! $potrero || (int) $potrero->farm_id !== $farmId) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El potrero seleccionado no pertenece a esta granja.',
+                    'errors' => [
+                        'potrero_id' => ['El potrero seleccionado no pertenece a esta granja.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if (! $potrero->is_active) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El potrero seleccionado se encuentra inactivo.',
+                    'errors' => [
+                        'potrero_id' => ['El potrero seleccionado se encuentra inactivo.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if ((int) $species->id !== (int) $potrero->species_id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'La especie no coincide con la especie asignada al potrero.',
+                    'errors' => [
+                        'species_id' => ['La especie no coincide con la especie asignada al potrero.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $galponId = null;
+            $potreroId = $potrero->id;
+            $destLabel = 'potrero';
+            $destCapacity = (int) $potrero->max_capacity;
+            $destSector = $potrero->sector ?: ($potrero->category ?: 'General');
+            $destPurpose = $potrero->purpose ?: null;
+            $occupied = Lot::occupiedCapacityForPotrero($potrero->id);
+        } else {
+            if (! $request->filled('galpon_id')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El galpón destino es obligatorio para esta especie.',
+                    'errors' => [
+                        'galpon_id' => ['El galpón destino es obligatorio para esta especie.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            // Galpon: must belong to the same farm and be active
+            $galpon = Galpon::find($request->galpon_id);
+
+            if (! $galpon || (int) $galpon->farm_id !== $farmId) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El galpón seleccionado no pertenece a esta granja.',
+                    'errors' => [
+                        'galpon_id' => ['El galpón seleccionado no pertenece a esta granja.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if (! $galpon->is_active) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El galpón seleccionado se encuentra inactivo.',
+                    'errors' => [
+                        'galpon_id' => ['El galpón seleccionado se encuentra inactivo.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if ((int) $species->id !== (int) $galpon->species_id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'La especie no coincide con la especie asignada al galpón.',
+                    'errors' => [
+                        'species_id' => ['La especie no coincide con la especie asignada al galpón.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $galponId = $galpon->id;
+            $potreroId = null;
+            $destLabel = 'galpón';
+            $destCapacity = (int) $galpon->max_capacity;
+            $destSector = $galpon->sector ?: ($galpon->category ?: 'General');
+            $destPurpose = $galpon->purpose ?: null;
+            $occupied = Lot::occupiedCapacity($galpon->id);
         }
 
         // Capacity validation: occupied + new quantity must not exceed max_capacity
-        $occupied = Lot::occupiedCapacity($galpon->id);
-        $available = (int) $galpon->max_capacity - $occupied;
+        $available = $destCapacity - $occupied;
 
         if ($available < (int) $request->quantity) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'La cantidad excede la capacidad disponible del galpón.',
+                'message' => sprintf('La cantidad excede la capacidad disponible del %s.', $destLabel),
                 'errors' => [
                     'quantity' => [
                         sprintf(
-                            'El galpón tiene %d de %d cupos ocupados. Solo quedan %d cupos disponibles para este lote.',
+                            'El %s tiene %d de %d cupos ocupados. Solo quedan %d cupos disponibles para este lote.',
+                            $destLabel,
                             $occupied,
-                            (int) $galpon->max_capacity,
+                            $destCapacity,
                             max(0, $available)
                         ),
                     ],
@@ -506,6 +663,7 @@ class LotController extends Controller
         $weanedServices = collect();
 
         if ($request->filled('from_service_ids')) {
+            $terms = $this->reproductionTerms($species->category);
             $serviceIds = array_values(array_unique(array_map('intval', (array) $request->input('from_service_ids'))));
 
             $weanedServices = AnimalService::with('animal:id,lote_id,identifier')
@@ -528,9 +686,9 @@ class LotController extends Controller
             if ($resolved) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Uno o más registros de destete ya fueron asignados a un lote de lechones.',
+                    'message' => "Uno o más registros de destete ya fueron asignados a un lote de {$terms['offspring']}.",
                     'errors' => [
-                        'from_service_ids' => ['Uno o más registros de destete ya fueron asignados a un lote de lechones.'],
+                        'from_service_ids' => ["Uno o más registros de destete ya fueron asignados a un lote de {$terms['offspring']}."],
                     ],
                 ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
@@ -539,7 +697,7 @@ class LotController extends Controller
 
             if ((int) $request->quantity !== $pendingSum) {
                 $message = sprintf(
-                    'La cantidad del lote debe coincidir exactamente con los %d lechones vivos pendientes de destete.',
+                    "La cantidad del lote debe coincidir exactamente con los %d {$terms['offspring']} vivos pendientes de destete.",
                     $pendingSum
                 );
 
@@ -553,14 +711,28 @@ class LotController extends Controller
             }
         }
 
-        // Automatic inheritance: sector and purpose come directly from the barn
-        $sector = $galpon->sector ?: ($galpon->category ?: 'General');
-        $purpose = $request->filled('purpose') ? trim((string) $request->purpose) : ($galpon->purpose ?: null);
+        // Automatic inheritance: sector and purpose come directly from the
+        // destination (potrero o galpón).
+        $sector = $destSector;
+        $purpose = $request->filled('purpose') ? trim((string) $request->purpose) : $destPurpose;
 
-        $lot = DB::transaction(function () use ($request, $farmId, $galpon, $species, $sector, $purpose, $weanedServices) {
+        // Las especies personalizadas ("Otro") solo admiten el propósito
+        // universal de carne, sin importar el destino elegido.
+        if ($species->is_custom && Species::normalizeKey((string) $purpose) !== 'carne') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Las especies personalizadas solo admiten el propósito Carne.',
+                'errors' => [
+                    'purpose' => ['Las especies personalizadas solo admiten el propósito Carne.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $lot = DB::transaction(function () use ($request, $farmId, $galponId, $potreroId, $species, $sector, $purpose, $weanedServices) {
             $lot = Lot::create([
                 'farm_id' => $farmId,
-                'galpon_id' => $galpon->id,
+                'galpon_id' => $galponId,
+                'potrero_id' => $potreroId,
                 'barn_id' => $request->has('barn_id') ? (int) $request->barn_id : null,
                 'code' => $this->generateUniqueCode(),
                 'species_id' => $species->id,
@@ -594,7 +766,8 @@ class LotController extends Controller
 
         $lot->load([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
-            'species:id,name,category,is_active',
+            'potrero:id,farm_id,name,sector,purpose,max_capacity,is_active',
+            'species:id,name,category,is_active,is_custom',
             'farm:id,name,code',
         ]);
         Lot::loadProductionAndHarvest(collect([$lot]));
@@ -654,6 +827,7 @@ class LotController extends Controller
 
         $validator = Validator::make($request->all(), [
             'galpon_id' => 'sometimes|required|integer|exists:galpones,id',
+            'potrero_id' => 'sometimes|required|integer|exists:potreros,id',
             'species_id' => 'sometimes|required|integer|exists:species,id',
             'quantity' => 'sometimes|required|integer|min:1',
             'purpose' => 'nullable|string|max:255',
@@ -710,9 +884,52 @@ class LotController extends Controller
             }
 
             $lot->galpon_id = $galpon->id;
+            $lot->potrero_id = null;
             $lot->sector = $galpon->sector ?: ($galpon->category ?: 'General');
             if (! $request->filled('purpose')) {
                 $lot->purpose = $galpon->purpose;
+            }
+        }
+
+        // Potrero change: validate farm ownership, active state and species match
+        if ($request->has('potrero_id')) {
+            $potrero = Potrero::find($request->potrero_id);
+
+            if (! $potrero || (int) $potrero->farm_id !== $farmId) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El potrero seleccionado no pertenece a esta granja.',
+                    'errors' => [
+                        'potrero_id' => ['El potrero seleccionado no pertenece a esta granja.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if (! $potrero->is_active) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El potrero seleccionado se encuentra inactivo.',
+                    'errors' => [
+                        'potrero_id' => ['El potrero seleccionado se encuentra inactivo.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            if ($request->has('species_id') && (int) $request->species_id !== (int) $potrero->species_id) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'La especie no coincide con la especie asignada al potrero.',
+                    'errors' => [
+                        'species_id' => ['La especie no coincide con la especie asignada al potrero.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $lot->potrero_id = $potrero->id;
+            $lot->galpon_id = null;
+            $lot->sector = $potrero->sector ?: ($potrero->category ?: 'General');
+            if (! $request->filled('purpose')) {
+                $lot->purpose = $potrero->purpose;
             }
         }
 
@@ -732,25 +949,25 @@ class LotController extends Controller
             $lot->species_id = $species->id;
         }
 
-        // Quantity change: revalidate the barn capacity excluding this lot's current occupancy
+        // Quantity change: revalidate the destination (potrero o galpón)
+        // capacity excluding this lot's current occupancy
         if ($request->has('quantity')) {
-            $galponId = $request->filled('galpon_id') ? (int) $request->galpon_id : (int) $lot->galpon_id;
-            $galpon = Galpon::find($galponId);
+            $context = $this->destinationCapacity($lot, true);
 
-            if ($galpon) {
-                $occupied = Lot::occupiedCapacity($galponId) - (int) $lot->quantity;
-                $available = (int) $galpon->max_capacity - $occupied;
+            if ($context !== null) {
+                $available = $context['capacity'] - $context['occupied'];
 
                 if ($available < (int) $request->quantity) {
                     return response()->json([
                         'status' => 'error',
-                        'message' => 'La cantidad excede la capacidad disponible del galpón.',
+                        'message' => sprintf('La cantidad excede la capacidad disponible del %s.', $context['label']),
                         'errors' => [
                             'quantity' => [
                                 sprintf(
-                                    'El galpón tiene %d de %d cupos ocupados (excluyendo este lote). Solo quedan %d cupos disponibles.',
-                                    $occupied,
-                                    (int) $galpon->max_capacity,
+                                    'El %s tiene %d de %d cupos ocupados (excluyendo este lote). Solo quedan %d cupos disponibles.',
+                                    $context['label'],
+                                    $context['occupied'],
+                                    $context['capacity'],
                                     max(0, $available)
                                 ),
                             ],
@@ -766,6 +983,20 @@ class LotController extends Controller
             $lot->purpose = trim((string) $request->purpose);
         }
 
+        // Las especies personalizadas ("Otro") solo admiten el propósito carne.
+        $effectiveSpecies = $species ?? ($lot->species_id ? Species::find($lot->species_id) : null);
+        if ($effectiveSpecies
+            && $effectiveSpecies->is_custom
+            && Species::normalizeKey((string) $lot->purpose) !== 'carne') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Las especies personalizadas solo admiten el propósito Carne.',
+                'errors' => [
+                    'purpose' => ['Las especies personalizadas solo admiten el propósito Carne.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         if ($request->filled('entry_date')) {
             $lot->entry_date = $request->input('entry_date');
         }
@@ -776,26 +1007,25 @@ class LotController extends Controller
                 : null;
         }
 
-        // Status change: reactivating a lot must respect the barn capacity
+        // Status change: reactivating a lot must respect the destination capacity
         if ($request->has('status')) {
             $newStatus = $request->input('status');
 
             if ($newStatus === Lot::STATUS_ACTIVE && $lot->status !== Lot::STATUS_ACTIVE) {
-                $galponId = $lot->galpon_id;
-                $galpon = $galponId ? Galpon::find($galponId) : null;
+                $context = $this->destinationCapacity($lot, true);
 
-                if ($galpon) {
-                    $occupied = Lot::occupiedCapacity($galponId);
-                    $available = (int) $galpon->max_capacity - $occupied;
+                if ($context !== null) {
+                    $available = $context['capacity'] - $context['occupied'];
 
                     if ($available < (int) $lot->quantity) {
                         return response()->json([
                             'status' => 'error',
-                            'message' => 'No se puede reactivar el lote: excede la capacidad disponible del galpón.',
+                            'message' => sprintf('No se puede reactivar el lote: excede la capacidad disponible del %s.', $context['label']),
                             'errors' => [
                                 'status' => [
                                     sprintf(
-                                        'El galpón solo tiene %d cupos disponibles y el lote requiere %d.',
+                                        'El %s solo tiene %d cupos disponibles y el lote requiere %d.',
+                                        $context['label'],
                                         max(0, $available),
                                         (int) $lot->quantity
                                     ),
@@ -812,7 +1042,8 @@ class LotController extends Controller
         $lot->save();
         $lot->load([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
-            'species:id,name,category,is_active',
+            'potrero:id,farm_id,name,sector,purpose,max_capacity,is_active',
+            'species:id,name,category,is_active,is_custom',
             'farm:id,name,code',
         ]);
 
@@ -913,7 +1144,7 @@ class LotController extends Controller
             // Full harvest: release the whole capacity and deactivate the lot (logical delete)
             $lot->quantity = 0;
             $lot->status = Lot::STATUS_INACTIVE;
-            $message = 'Lote cosechado correctamente. El cupo del galpón ha sido liberado.';
+            $message = 'Lote cosechado correctamente. El cupo del '.($lot->potrero_id ? 'potrero' : 'galpón').' ha sido liberado.';
         } else {
             // Partial harvest: only the harvested quantity is released
             $lot->quantity = $remaining;
@@ -923,7 +1154,8 @@ class LotController extends Controller
         $lot->save();
         $lot->load([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
-            'species:id,name,category,is_active',
+            'potrero:id,farm_id,name,sector,purpose,max_capacity,is_active',
+            'species:id,name,category,is_active,is_custom',
             'farm:id,name,code',
         ]);
         Lot::loadProductionAndHarvest(collect([$lot]));
@@ -1037,7 +1269,7 @@ class LotController extends Controller
 
         $lot->load([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
-            'species:id,name,category,is_active',
+            'species:id,name,category,is_active,is_custom',
             'farm:id,name,code',
         ]);
 
@@ -1210,6 +1442,8 @@ class LotController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'name' => 'nullable|string|max:255',
+            'color' => 'nullable|string|max:255',
             'breed' => 'nullable|string|max:255',
             'father_breed' => 'nullable|string|max:255',
             'mother_breed' => 'nullable|string|max:255',
@@ -1273,6 +1507,8 @@ class LotController extends Controller
         $animal = LoteAnimal::create([
             'lote_id' => $lot->id,
             'identifier' => $this->generateUniqueIdentifier(),
+            'name' => $request->filled('name') ? trim((string) $request->name) : null,
+            'color' => $request->filled('color') ? trim((string) $request->color) : null,
             'breed' => $request->filled('breed') ? trim((string) $request->breed) : null,
             'father_breed' => $request->filled('father_breed') ? trim((string) $request->father_breed) : null,
             'mother_breed' => $request->filled('mother_breed') ? trim((string) $request->mother_breed) : null,
@@ -1335,6 +1571,8 @@ class LotController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'name' => 'nullable|string|max:255',
+            'color' => 'nullable|string|max:255',
             'breed' => 'nullable|string|max:255',
             'father_breed' => 'nullable|string|max:255',
             'mother_breed' => 'nullable|string|max:255',
@@ -1368,6 +1606,12 @@ class LotController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        if ($request->has('name')) {
+            $animal->name = $request->filled('name') ? trim((string) $request->name) : null;
+        }
+        if ($request->has('color')) {
+            $animal->color = $request->filled('color') ? trim((string) $request->color) : null;
+        }
         if ($request->filled('breed')) {
             $animal->breed = trim((string) $request->breed);
         }
@@ -1565,9 +1809,11 @@ class LotController extends Controller
             ->with('animal:id,lote_id,identifier')
             ->get(['id', 'lote_animal_id', 'birth_date', 'total_piglets', 'live_piglets', 'pending_piglets']);
 
+        $terms = $this->reproductionTerms($lot->sector ?? null);
+
         return response()->json([
             'status' => 'success',
-            'message' => 'Lechones destetados pendientes obtenidos con éxito.',
+            'message' => ucfirst($terms['offspring']).' destetados pendientes obtenidos con éxito.',
             'data' => [
                 'pending_piglets' => (int) $services->sum('pending_piglets'),
                 'services' => $services->values(),
@@ -1585,6 +1831,8 @@ class LotController extends Controller
                 'message' => 'Animal no encontrado o sin acceso.',
             ], Response::HTTP_NOT_FOUND);
         }
+
+        $terms = $this->reproductionTerms($animal->lote->sector ?? null);
 
         $validator = Validator::make($request->all(), [
             'service_type' => 'required|string|in:inseminación,monta,parto',
@@ -1604,9 +1852,9 @@ class LotController extends Controller
             'service_type.in' => 'El tipo de servicio debe ser inseminación, monta o parto.',
             'service_date.required' => 'La fecha del servicio es obligatoria.',
             'birth_date.required_if' => 'La fecha del parto es obligatoria al registrar el destete/parto.',
-            'total_piglets.required_if' => 'El total de lechones es obligatorio al registrar el destete/parto.',
-            'live_piglets.required_if' => 'Los lechones vivos son obligatorios al registrar el destete/parto.',
-            'live_piglets.max' => 'Los lechones vivos no pueden superar el total de lechones.',
+            'total_piglets.required_if' => "El total de {$terms['offspring']} es obligatorio al registrar el destete/parto.",
+            'live_piglets.required_if' => "Los {$terms['offspring']} vivos son obligatorios al registrar el destete/parto.",
+            'live_piglets.max' => "Los {$terms['offspring']} vivos no pueden superar el total de {$terms['offspring']}.",
         ]);
 
         if ($validator->fails()) {
@@ -1625,7 +1873,7 @@ class LotController extends Controller
         if ($animal->status === LoteAnimal::STATUS_GESTATION && $status !== AnimalService::STATUS_WEANED) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'La cerda se encuentra actualmente en gestación; debe registrar su destete/parto.',
+                'message' => "La {$terms['female']} se encuentra actualmente en gestación; debe registrar su destete/parto.",
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 

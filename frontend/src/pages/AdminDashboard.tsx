@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { farmService } from '../services/farmService';
@@ -8,12 +8,17 @@ import { subordinateService } from '../services/subordinateService';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
-import { Badge } from '../components/ui/Badge';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
 import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled } from '../config/modules';
 import { safeText } from '../utils/safeText';
+import { Progress } from '../components/charts/Progress';
+import { Donut } from '../components/charts/Donut';
+import { Gauge } from '../components/charts/Gauge';
+import { Sparkline } from '../components/charts/Sparkline';
+import { useNow } from '../hooks/useNow';
+import { timeAgo } from '../utils/timeAgo';
 import type { ModuleId, Subordinate } from '../types/auth';
 import {
   Building2,
@@ -21,23 +26,11 @@ import {
   CheckCircle2,
   Sliders,
   Plus,
-  ArrowRight,
-  Boxes,
-  Warehouse,
-  Layers,
-  ClipboardList,
-  BarChart3,
   UserCheck,
+  RefreshCw,
+  Activity,
+  AlertTriangle,
 } from 'lucide-react';
-
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  Layers,
-  Warehouse,
-  Boxes,
-  ClipboardList,
-  BarChart3,
-  Users,
-};
 
 const extractModulesArrayFromPayload = (payload: any): any[] | null => {
   if (!payload) return null;
@@ -90,6 +83,12 @@ export const AdminDashboard: React.FC = () => {
   // Dashboard stats state and real subordinates list
   const [stats, setStats] = useState<any>(null);
   const [subordinatesList, setSubordinatesList] = useState<any[]>([]);
+
+  // Datos en vivo: último refresco, refresco manual y muestreo de tendencia
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [subsTrend, setSubsTrend] = useState<number[]>([]);
+  const now = useNow(1000);
 
   const storedUser = tokenStorage.getUser();
   const targetFarmId =
@@ -281,11 +280,27 @@ export const AdminDashboard: React.FC = () => {
 
     // 3. Load active farm modules
     await loadFarmActiveModules(resolvedFarmId);
+
+    setLastUpdated(new Date());
   };
+
+  // Mantiene una referencia actualizada del cargador para el auto-refresco
+  const loadDashboardDataRef = useRef(loadDashboardData);
+  useEffect(() => {
+    loadDashboardDataRef.current = loadDashboardData;
+  });
 
   useEffect(() => {
     loadDashboardData();
   }, [targetFarmId]);
+
+  // Auto-refresco silencioso cada 30 s (datos en vivo)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void loadDashboardDataRef.current?.();
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Enabled modules for this admin's farm (Authorized and Active from Root)
   const farmModules = (
@@ -319,6 +334,38 @@ export const AdminDashboard: React.FC = () => {
     if (subordinatesList.length > 0) return subordinatesList.length;
     return farmSubordinates.length;
   })();
+
+  // Distribución de encargados (para la mini-gráfica de dona)
+  const activeSubordinates = displayedSubordinates.filter(
+    (s: any) => s.status === 'active' || s.is_active === true
+  ).length;
+  const inactiveSubordinates = Math.max(0, displayedSubordinates.length - activeSubordinates);
+
+  // Cobertura de módulos frente al catálogo completo del sistema
+  const totalSystemModules = Object.keys(SYSTEM_MODULES).length;
+  const modulesCoverage =
+    totalSystemModules > 0 ? Math.round((farmModules.length / totalSystemModules) * 100) : 0;
+
+  const installationState =
+    farmModules.length === 0
+      ? { label: 'Sin módulos activos', ok: false }
+      : { label: modulesCoverage >= 100 ? 'Totalmente Operativa' : 'Operativa (parcial)', ok: true };
+
+  // Muestreo para la mini-gráfica de tendencia de la sesión
+  useEffect(() => {
+    if (!lastUpdated) return;
+    setSubsTrend((prev) => [...prev, subordinatesCount].slice(-20));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastUpdated]);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadDashboardData();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleOpenAddSubModal = () => {
     loadFarmActiveModules();
@@ -413,6 +460,21 @@ export const AdminDashboard: React.FC = () => {
         title={activeFarm ? safeText(activeFarm.name, 'Mi Granja Agropecuaria') : 'Mi Granja Agropecuaria'}
         subtitle={`${safeText(activeFarm?.code, 'FARM')} • ${safeText(activeFarm?.location, 'Ubicación')} — Monitoreo de producción, lotes y delegación de tareas a encargados.`}
       >
+        <div className="flex items-center gap-2">
+          {lastUpdated && (
+            <span className="hidden sm:inline text-[10px] font-semibold text-gray-400 dark:text-gray-500 mr-1">
+              Actualizado {timeAgo(lastUpdated, now)}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            icon={<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />}
+          >
+            Actualizar
+          </Button>
           <Button
             variant="accent"
             size="sm"
@@ -421,110 +483,125 @@ export const AdminDashboard: React.FC = () => {
           >
             Nuevo Encargado
           </Button>
+        </div>
       </PageHeader>
 
       {/* Farm Status & Modules Count Header */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-[#1B4D3E]">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Módulos Habilitados</p>
               <h4 className="text-2xl font-black text-[#1E1E1E] dark:text-white mt-1">
-                {farmModules.length} Módulos
+                {farmModules.length}
+                <span className="text-sm font-bold text-gray-400"> / {totalSystemModules}</span>
               </h4>
             </div>
             <div className="p-3 bg-[#1B4D3E]/10 rounded-xl text-[#1B4D3E] dark:text-[#6DBF5C]">
               <Building2 className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Asignados por el Administrador Root</p>
+          <div className="mt-4">
+            <Progress
+              value={modulesCoverage}
+              color="#1B4D3E"
+              label="Cobertura del sistema"
+              valueLabel={`${modulesCoverage}%`}
+            />
+          </div>
+          <p className="text-[11px] text-gray-500 mt-2">Asignados por el Administrador Root</p>
         </Card>
 
         <Card className="border-l-4 border-l-[#4E9F3D]">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Encargados de Campo</p>
               <h4 className="text-2xl font-black text-[#1E1E1E] dark:text-white mt-1">
-                {subordinatesCount} Subordinados
+                {subordinatesCount}
               </h4>
             </div>
             <div className="p-3 bg-[#4E9F3D]/10 rounded-xl text-[#4E9F3D]">
               <Users className="w-6 h-6" />
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Personal con acceso a vistas operativas</p>
+          <div className="mt-3 flex items-center gap-4">
+            <Donut
+              size={72}
+              thickness={12}
+              showLegend={false}
+              centerValue={String(displayedSubordinates.length)}
+              segments={[
+                { label: 'Activos', value: activeSubordinates, color: '#4E9F3D' },
+                { label: 'Inactivos', value: inactiveSubordinates, color: '#CBD5E1' },
+              ]}
+            />
+            <div className="text-[11px] space-y-1.5">
+              <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#4E9F3D]" />
+                Activos <b className="text-[#1E1E1E] dark:text-white">{activeSubordinates}</b>
+              </div>
+              <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+                Inactivos <b className="text-[#1E1E1E] dark:text-white">{inactiveSubordinates}</b>
+              </div>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-2">Personal con acceso a vistas operativas</p>
         </Card>
 
         <Card className="border-l-4 border-l-emerald-500">
-          <div className="flex items-center justify-between">
+          <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Estado de Instalación</p>
-              <h4 className="text-xl font-bold text-[#4E9F3D] mt-1 flex items-center gap-1.5">
-                <CheckCircle2 className="w-5 h-5" /> Totalmente Operativa
+              <h4
+                className={`text-base font-black mt-1 flex items-center gap-1.5 ${
+                  installationState.ok ? 'text-[#4E9F3D]' : 'text-amber-600 dark:text-amber-400'
+                }`}
+              >
+                {installationState.ok ? (
+                  <CheckCircle2 className="w-4 h-4" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4" />
+                )}
+                {installationState.label}
               </h4>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Capacidad y densidad verificadas</p>
-        </Card>
-      </div>
-
-      {/* Active Modules Grid */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-[#1E1E1E] dark:text-gray-100">
-              Módulos Habilitados para la Granja
-            </h2>
-            <p className="text-xs text-gray-500">
-              Módulos activados por Root. Haz clic en cualquiera para abrir su consola de control.
-            </p>
+          <div className="mt-2 flex justify-center">
+            <Gauge
+              value={modulesCoverage}
+              size={104}
+              thickness={9}
+              color={installationState.ok ? '#4E9F3D' : '#D97706'}
+              centerValue={`${modulesCoverage}%`}
+              centerLabel="operativo"
+            />
           </div>
-        </div>
+        </Card>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {farmModules.length === 0 ? (
-            <div className="col-span-full p-6 bg-amber-50 dark:bg-amber-950/40 rounded-2xl border border-amber-200 dark:border-amber-900/50 text-center text-xs text-amber-800 dark:text-amber-300 font-semibold">
-              ⚠️ No hay módulos activados por Root para esta granja.
+        <Card className="border-l-4 border-l-blue-500">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tendencia (sesión)</p>
+              <h4 className="text-2xl font-black text-[#1E1E1E] dark:text-white mt-1">
+                {subordinatesCount}
+                <span className="text-xs font-bold text-gray-400 ml-1">encargados</span>
+              </h4>
             </div>
-          ) : (
-            (farmModules || []).map((modId) => {
-              const mod = SYSTEM_MODULES[modId];
-              if (!mod) return null;
-              const Icon = ICON_MAP[mod.icon] || Boxes;
-
-              return (
-                <Card
-                  key={`admin-farm-mod-${modId}`}
-                  className="hover:border-[#1B4D3E] dark:hover:border-[#4E9F3D] transition-all cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="p-3 rounded-xl bg-[#1B4D3E]/10 dark:bg-[#1B4D3E]/30 text-[#1B4D3E] dark:text-[#6DBF5C] group-hover:bg-[#1B4D3E] group-hover:text-white transition-colors">
-                      <Icon className="w-6 h-6" />
-                    </div>
-                    <Badge variant="success">Activo</Badge>
-                  </div>
-
-                  <h3 className="font-bold text-base text-[#1E1E1E] dark:text-gray-100 mt-4 group-hover:text-[#1B4D3E] dark:group-hover:text-[#6DBF5C] transition-colors">
-                    {safeText(mod.name)}
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                    {safeText(mod.description)}
-                  </p>
-
-                  <div className="mt-4 pt-3 border-t border-gray-100 dark:border-[#263632] flex items-center justify-between text-xs font-semibold text-[#1B4D3E] dark:text-[#6DBF5C]">
-                    <button
-                      onClick={() => navigate(`/modules/${modId}`)}
-                      className="flex items-center gap-1 hover:underline cursor-pointer"
-                    >
-                      <span>Ingresar al Módulo</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </Card>
-              );
-            })
-          )}
-        </div>
+            <div className="p-3 bg-blue-500/10 rounded-xl text-blue-500">
+              <Activity className="w-6 h-6" />
+            </div>
+          </div>
+          <div className="mt-2">
+            <Sparkline
+              data={subsTrend}
+              color="#3B82F6"
+              height={40}
+              ariaLabel="Tendencia de encargados en la sesión"
+            />
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1">Muestreo automático cada 30 s</p>
+        </Card>
       </div>
 
       {/* Subordinates Management Section */}
@@ -597,7 +674,13 @@ export const AdminDashboard: React.FC = () => {
                     </td>
 
                     <td className="py-4 px-4 text-gray-500">
-                      {safeText(sub.lastAccess, 'Hoy')}
+                      {(() => {
+                        const parsed = sub.lastAccess ? new Date(sub.lastAccess) : null;
+                        if (parsed && !Number.isNaN(parsed.getTime())) {
+                          return timeAgo(parsed, now);
+                        }
+                        return safeText(sub.lastAccess, 'Sin registro');
+                      })()}
                     </td>
 
                     <td className="py-4 px-4">

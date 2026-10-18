@@ -4,40 +4,22 @@ import { useAuth } from '../context/AuthContext';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { PageHeader } from '../components/ui/PageHeader';
-import { SYSTEM_MODULES } from '../config/modules';
+import { Button } from '../components/ui/Button';
+import { Donut } from '../components/charts/Donut';
+import { Sparkline } from '../components/charts/Sparkline';
 import { activityService } from '../services/activityService';
+import { useNow } from '../hooks/useNow';
+import { timeAgo } from '../utils/timeAgo';
 import {
   ClipboardCheck,
   CheckCircle2,
   ArrowRight,
-  Boxes,
-  PiggyBank,
-  Egg,
-  Beef,
-  Home,
-  PackageCheck,
   TrendingUp,
-  Truck,
-  BarChart3,
-  Users,
   ShieldCheck,
   Clock,
   AlertTriangle,
   RefreshCw,
 } from 'lucide-react';
-
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  PiggyBank,
-  Egg,
-  Beef,
-  Boxes,
-  Home,
-  PackageCheck,
-  TrendingUp,
-  Truck,
-  BarChart3,
-  Users,
-};
 
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
 import { safeText } from '../utils/safeText';
@@ -57,21 +39,28 @@ export const EncargadoDashboard: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
 
-  const loadActivities = useCallback(async () => {
-    setIsLoadingActivities(true);
+  // Datos en vivo: último refresco, refresco manual y muestreo de tendencia
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pendingTrend, setPendingTrend] = useState<number[]>([]);
+  const now = useNow(1000);
+
+  const loadActivities = useCallback(async (showSpinner: boolean = true) => {
+    if (showSpinner) setIsLoadingActivities(true);
     try {
       const result = await activityService.getMy();
-      // Mostrar primero las pendientes/en proceso, limitado a 5
+      // Ordena por estado para mostrar primero las pendientes/en proceso
       const sorted = [...(result.data || [])].sort((a, b) => {
         const order: Record<string, number> = { pendiente: 0, en_proceso: 1, terminada: 2 };
         return (order[a.status] ?? 3) - (order[b.status] ?? 3);
       });
-      setActivities(sorted.slice(0, 5));
+      setActivities(sorted);
     } catch {
       // El módulo puede estar deshabilitado: el dashboard sigue funcionando
       setActivities([]);
     } finally {
       setIsLoadingActivities(false);
+      setLastUpdated(new Date());
     }
   }, []);
 
@@ -79,11 +68,48 @@ export const EncargadoDashboard: React.FC = () => {
     void loadActivities();
   }, [loadActivities]);
 
+  // Auto-refresco silencioso cada 30 s (datos en vivo)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void loadActivities(false);
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, [loadActivities]);
+
+  // Distribución de actividades por estado (categorías mutuamente excluyentes)
+  const overdueCount = activities.filter((a) => a.is_overdue && a.status !== 'terminada').length;
+  const pendingCount = activities.filter((a) => a.status === 'pendiente' && !a.is_overdue).length;
+  const inProgressCount = activities.filter((a) => a.status === 'en_proceso' && !a.is_overdue).length;
+  const doneCount = activities.filter((a) => a.status === 'terminada').length;
+  const activitySegments = [
+    { label: 'Pendientes', value: pendingCount, color: '#F59E0B' },
+    { label: 'En proceso', value: inProgressCount, color: '#3B82F6' },
+    { label: 'Terminadas', value: doneCount, color: '#4E9F3D' },
+    { label: 'Vencidas', value: overdueCount, color: '#EF4444' },
+  ];
+
+  // Muestreo para la mini-gráfica de tendencia de la sesión
+  useEffect(() => {
+    if (!lastUpdated) return;
+    setPendingTrend((prev) => [...prev, pendingCount].slice(-20));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastUpdated]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadActivities(false);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   if (!user) {
     return <SkeletonLoader type="dashboard" />;
   }
 
   const assignedModules = user?.enabledModules || [];
+  const topActivities = activities.slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -95,10 +121,28 @@ export const EncargadoDashboard: React.FC = () => {
         title={`Hola, ${safeText(user?.name, 'Encargado')}`}
         subtitle={`${safeText(user?.farmName || activeFarm?.name, 'Granja Agropecuaria')} — Tareas de campo, registro de bitácora y monitoreo de lotes asignados por tu Administrador.`}
       >
+        <div className="flex items-center gap-2">
           <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-[#4E9F3D]/10 text-[#1B4D3E] dark:text-[#6DBF5C] text-xs font-semibold border border-[#4E9F3D]/20">
             <Clock className="w-4 h-4" />
-            <span>Turno Activo • Hoy 08:00 AM</span>
+            <span>
+              Turno Activo •{' '}
+              {now.toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              })}
+            </span>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            icon={<RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />}
+          >
+            Actualizar
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Security Context Banner */}
@@ -115,53 +159,13 @@ export const EncargadoDashboard: React.FC = () => {
           </div>
         </div>
 
-        <Badge variant="success">Filtro de Seguridad Activo</Badge>
-      </div>
-
-      {/* Operational Modules Assigned */}
-      <div>
-        <h2 className="text-lg font-bold text-[#1E1E1E] dark:text-gray-100 mb-3">
-          Módulos Operativos Permitidos
-        </h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {(assignedModules || []).map((modItem: any, idx) => {
-            const modId = typeof modItem === 'string' ? modItem : modItem?.code || modItem?.slug || modItem?.id || String(modItem || '');
-            const mod = SYSTEM_MODULES[modId as keyof typeof SYSTEM_MODULES];
-            if (!mod) return null;
-            const Icon = ICON_MAP[mod.icon] || Boxes;
-
-            return (
-              <Card
-                key={`encargado-mod-${modId || idx}`}
-                className="hover:border-[#4E9F3D] transition-all cursor-pointer group"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="p-3 rounded-xl bg-[#4E9F3D]/10 dark:bg-[#4E9F3D]/20 text-[#4E9F3D] group-hover:bg-[#4E9F3D] group-hover:text-white transition-colors">
-                    <Icon className="w-6 h-6" />
-                  </div>
-                  <Badge variant="success">Asignado</Badge>
-                </div>
-
-                <h3 className="font-bold text-base text-[#1E1E1E] dark:text-gray-100 mt-4 group-hover:text-[#4E9F3D] transition-colors">
-                  {safeText(mod.name)}
-                </h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                  {safeText(mod.description)}
-                </p>
-
-                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-[#263632] flex items-center justify-between text-xs font-semibold text-[#4E9F3D]">
-                  <button
-                    onClick={() => navigate(`/modules/${modId}`)}
-                    className="flex items-center gap-1 hover:underline cursor-pointer"
-                  >
-                    <span>Registrar Trabajo en Módulo</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </Card>
-            );
-          })}
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <Badge variant="success">Filtro de Seguridad Activo</Badge>
+          {lastUpdated && (
+            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+              Actualizado {timeAgo(lastUpdated, now)}
+            </span>
+          )}
         </div>
       </div>
 
@@ -190,8 +194,51 @@ export const EncargadoDashboard: React.FC = () => {
             <p className="text-xs mt-1">Cuando tu administrador te asigne una tarea, aparecerá aquí.</p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {activities.map((activity) => (
+          <div className="space-y-5">
+            {/* Resumen visual: distribución + tendencia de la sesión */}
+            <div className="p-4 rounded-2xl bg-gray-50/60 dark:bg-[#121816] border border-gray-100 dark:border-[#263632]">
+              <div className="flex flex-col lg:flex-row items-start gap-6">
+                <Donut
+                  segments={activitySegments}
+                  size={140}
+                  thickness={20}
+                  centerValue={String(activities.length)}
+                  showLegend={false}
+                />
+                <div className="flex-1 w-full">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {activitySegments.map((segment) => (
+                      <div
+                        key={`activity-stat-${segment.label}`}
+                        className="rounded-xl bg-white dark:bg-[#18221F] border border-gray-100 dark:border-[#263632] px-3 py-2"
+                      >
+                        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: segment.color }} />
+                          {segment.label}
+                        </div>
+                        <div className="text-lg font-black text-[#1E1E1E] dark:text-white">
+                          {segment.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4">
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-[#4E9F3D]" /> Tendencia de pendientes (sesión)
+                    </div>
+                    <Sparkline
+                      data={pendingTrend}
+                      color="#4E9F3D"
+                      height={40}
+                      ariaLabel="Tendencia de actividades pendientes"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+            {topActivities.map((activity) => (
               <div
                 key={activity.id}
                 className="p-3 rounded-xl border border-gray-100 dark:border-[#263632] flex items-center justify-between bg-gray-50/50 dark:bg-[#121816]"
@@ -239,6 +286,7 @@ export const EncargadoDashboard: React.FC = () => {
                 </div>
               </div>
             ))}
+            </div>
           </div>
         )}
       </Card>

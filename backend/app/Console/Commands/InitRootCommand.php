@@ -39,6 +39,7 @@ class InitRootCommand extends Command
             ['code' => 'inventory', 'name' => 'Inventario', 'description' => 'Control de Insumos y Movimientos de Inventario'],
             ['code' => 'analytics', 'name' => 'Analítica y Reportes', 'description' => 'Analíticas, Estadísticas y Reportes Agropecuarios'],
             ['code' => 'history', 'name' => 'Historial y Auditoría', 'description' => 'Historial y Registro de Auditoría de Actividades'],
+            ['code' => 'potreros', 'name' => 'Potreros', 'description' => 'Módulo de Potreros y Pastoreo (Bovino, Ovino y Caprino)'],
         ];
 
         $validCodes = array_column($officialModules, 'code');

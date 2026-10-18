@@ -100,6 +100,18 @@ class Species extends Model
         return null;
     }
 
+    /**
+     * ¿El nombre es personalizado (no pertenece a la taxonomía oficial del
+     * sector)? Las especies registradas con "Otro" solo admiten el propósito
+     * universal de carne.
+     */
+    public static function isCustomName(?string $category, ?string $name): bool
+    {
+        $canonical = self::canonicalCategory($category) ?? $category;
+
+        return self::canonicalSpeciesName($canonical, $name) === null;
+    }
+
     protected $table = 'species';
 
     protected $fillable = [
@@ -107,10 +119,12 @@ class Species extends Model
         'name',
         'category',
         'is_active',
+        'is_custom',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_custom' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

@@ -325,7 +325,7 @@ class ExecutivePdfReportController extends Controller
     {
         $lotQuery = Lot::query()->with([
             'galpon:id,farm_id,name,sector,purpose,max_capacity,is_active',
-            'species:id,name,category,is_active',
+            'species:id,name,category,is_active,is_custom',
             'farm:id,name,code',
         ]);
         $this->applyFarmScope($lotQuery, $farmId);

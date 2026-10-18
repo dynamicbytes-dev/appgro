@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Registro individual de un animal dentro de un lote
- * (porcinos de reproducción).
+ * (porcinos y conejos de reproducción).
  *
  * El aislamiento multigranja se aplica mediante un scope global que
  * filtra por la granja del lote padre (`lote.farm_id`).
@@ -41,6 +41,8 @@ class LoteAnimal extends Model
     protected $fillable = [
         'lote_id',
         'identifier',
+        'name',
+        'color',
         'breed',
         'father_breed',
         'mother_breed',

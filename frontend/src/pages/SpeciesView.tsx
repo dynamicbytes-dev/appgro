@@ -246,7 +246,8 @@ export const SpeciesView: React.FC = () => {
     const isOfficialAnimal = !!matchedCategory?.animals.some(
       (a) => normalizeText(a) === normalizeText(sp.name || '')
     );
-    setIsCustomName(!isOfficialAnimal);
+    // Respeta la marca persistida; si no existe, la deduce del nombre.
+    setIsCustomName(typeof sp.is_custom === 'boolean' ? sp.is_custom : !isOfficialAnimal);
     setFormIsActive(Boolean(sp.is_active));
     setFormFarmId(String(sp.farm_id || ''));
     setIsEditModalOpen(true);
@@ -271,8 +272,7 @@ export const SpeciesView: React.FC = () => {
     if (nameFieldError) {
       const isUniqueConflict =
         /existe|duplicad|unique|ya existe/i.test(nameFieldError) ||
-        /existe|duplicad|unique/i.test(serverMessage) ||
-        is422;
+        /existe|duplicad|unique/i.test(serverMessage);
 
       if (isUniqueConflict) {
         isDuplicate = true;
@@ -526,6 +526,7 @@ export const SpeciesView: React.FC = () => {
         name: formName.trim(),
         category: formCategory.trim(),
         is_active: formIsActive,
+        is_custom: isCustomName,
         farm_id: targetFarmId ? targetFarmId : undefined,
       });
 
@@ -586,6 +587,7 @@ export const SpeciesView: React.FC = () => {
         name: formName.trim(),
         category: formCategory.trim(),
         is_active: formIsActive,
+        is_custom: isCustomName,
       });
 
       setSpeciesList((prev) =>

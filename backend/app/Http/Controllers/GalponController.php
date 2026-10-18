@@ -32,7 +32,7 @@ class GalponController extends Controller
             'REPRODUCCIÓN',
             'REPRODUCCION',
         ],
-        'cunícula' => [
+        'cunícola' => [
             'carne',
             'Carne',
             'CARNE',
@@ -93,8 +93,21 @@ class GalponController extends Controller
         ],
     ];
 
+    /**
+     * Sectores pecuarios habilitados para el módulo de Galpones.
+     * Bovino/Ovino/Caprino se gestionarán en el módulo "Potreros".
+     */
+    public const ALLOWED_BARN_CATEGORIES = ['avícola', 'porcina', 'cunícola'];
+
     private function isPurposeAllowedForSpecies(string $purpose, Species $species): bool
     {
+        // Especies personalizadas (registradas con "Otro"): solo admiten el
+        // propósito universal de carne, ya que no pertenecen a la taxonomía
+        // oficial del sector.
+        if ($species->is_custom) {
+            return Species::normalizeKey($purpose) === 'carne';
+        }
+
         $category = Species::canonicalCategory($species->category);
         $allowedPurposes = self::PURPOSES_BY_CATEGORY[$category] ?? [];
 
@@ -117,7 +130,7 @@ class GalponController extends Controller
 
         $query = Galpon::query()->with([
             'farm:id,name,code',
-            'species:id,name,category,is_active',
+            'species:id,name,category,is_active,is_custom',
         ]);
 
         // Multi-farm isolation and safe sanitization of farm_id (handles "all" without SQL 22P02 error)
@@ -411,6 +424,16 @@ class GalponController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        if (! in_array(Species::canonicalCategory($species->category), self::ALLOWED_BARN_CATEGORIES, true)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'El módulo de Galpones solo admite especies de los sectores Avícola, Porcino y Cunícola.',
+                'errors' => [
+                    'species_id' => ['El módulo de Galpones solo admite especies de los sectores Avícola, Porcino y Cunícola. Las demás se gestionarán en el módulo Potreros.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         if (! $this->isPurposeAllowedForSpecies($request->purpose, $species)) {
             return response()->json([
                 'status' => 'error',
@@ -435,7 +458,7 @@ class GalponController extends Controller
             'is_active' => $request->has('is_active') ? (bool) $request->is_active : true,
         ]);
 
-        $galpon->load(['farm:id,name,code', 'species:id,name,category,is_active']);
+        $galpon->load(['farm:id,name,code', 'species:id,name,category,is_active,is_custom']);
 
         return response()->json([
             'status' => 'success',
@@ -453,7 +476,7 @@ class GalponController extends Controller
 
         $galpon = Galpon::withoutGlobalScopes()->with([
             'farm:id,name,code',
-            'species:id,name,category,is_active',
+            'species:id,name,category,is_active,is_custom',
             'lots',
         ])->find($id);
 
@@ -548,6 +571,17 @@ class GalponController extends Controller
                 ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
+            if ((int) $species->id !== (int) $galpon->species_id
+                && ! in_array(Species::canonicalCategory($species->category), self::ALLOWED_BARN_CATEGORIES, true)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El módulo de Galpones solo admite especies de los sectores Avícola, Porcino y Cunícola.',
+                    'errors' => [
+                        'species_id' => ['El módulo de Galpones solo admite especies de los sectores Avícola, Porcino y Cunícola. Las demás se gestionarán en el módulo Potreros.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
             $galpon->species_id = $species->id;
             $galpon->category = $species->category ?? 'General';
             $galpon->sector = $species->category ?? 'General';
@@ -581,7 +615,7 @@ class GalponController extends Controller
         }
 
         $galpon->save();
-        $galpon->load(['farm:id,name,code', 'species:id,name,category,is_active']);
+        $galpon->load(['farm:id,name,code', 'species:id,name,category,is_active,is_custom']);
 
         return response()->json([
             'status' => 'success',
@@ -619,7 +653,7 @@ class GalponController extends Controller
 
         $galpon->is_active = $newStatus;
         $galpon->save();
-        $galpon->load(['farm:id,name,code', 'species:id,name,category,is_active']);
+        $galpon->load(['farm:id,name,code', 'species:id,name,category,is_active,is_custom']);
 
         return response()->json([
             'status' => 'success',

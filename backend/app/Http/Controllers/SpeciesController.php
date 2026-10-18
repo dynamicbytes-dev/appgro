@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Galpon;
+use App\Models\Potrero;
 use App\Models\Species;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -236,10 +237,27 @@ class SpeciesController extends Controller
                 return;
             }
 
-            if (!array_key_exists($value, Species::TAXONOMY[$category])) {
-                $allowed = implode(', ', array_keys(Species::TAXONOMY[$category]));
-                $fail("La especie \"{$value}\" no pertenece al sector {$category}. Especies permitidas: {$allowed}.");
+            // Official name of the selected sector: valid (already canonicalized).
+            if (array_key_exists($value, Species::TAXONOMY[$category])) {
+                return;
             }
+
+            // An official name from a different sector is a real mistake
+            // (e.g. "Pollo" under bovina) and must be rejected.
+            foreach (array_keys(Species::TAXONOMY) as $otherCategory) {
+                if ($otherCategory === $category) {
+                    continue;
+                }
+
+                if (Species::canonicalSpeciesName($otherCategory, $value) !== null) {
+                    $fail("La especie \"{$value}\" pertenece al sector {$otherCategory}, no a {$category}.");
+
+                    return;
+                }
+            }
+
+            // Any other name is accepted as a custom variant within the
+            // selected sector (e.g. "Cerdo de Engorde", "Vaca Holstein").
         };
     }
 
@@ -291,6 +309,7 @@ class SpeciesController extends Controller
             ],
             'category' => ['required', 'string', Rule::in(Species::VALID_CATEGORIES)],
             'is_active' => 'nullable|boolean',
+            'is_custom' => 'nullable|boolean',
             'farm_id' => 'nullable|exists:farms,id',
         ], [
             'name.required' => 'El nombre de la especie es obligatorio.',
@@ -326,6 +345,10 @@ class SpeciesController extends Controller
             'name' => trim($request->name),
             'category' => trim($request->category),
             'is_active' => $request->has('is_active') ? (bool) $request->is_active : true,
+            // La marca "personalizada" solo es válida si el nombre no
+            // pertenece a la taxonomía oficial del sector.
+            'is_custom' => $request->boolean('is_custom')
+                && Species::isCustomName(trim((string) $request->category), trim((string) $request->name)),
             'farm_id' => $farmId,
         ]);
 
@@ -409,6 +432,7 @@ class SpeciesController extends Controller
             ],
             'category' => ['required', 'string', Rule::in(Species::VALID_CATEGORIES)],
             'is_active' => 'nullable|boolean',
+            'is_custom' => 'nullable|boolean',
         ], [
             'name.required' => 'El nombre de la especie es obligatorio.',
             'name.unique' => 'Ya existe una especie con este nombre en la granja seleccionada.',
@@ -444,6 +468,13 @@ class SpeciesController extends Controller
 
         if ($request->has('is_active')) {
             $species->is_active = (bool) $request->is_active;
+        }
+
+        // La marca "personalizada" solo es válida si el nombre no pertenece
+        // a la taxonomía oficial del sector.
+        if ($request->has('is_custom')) {
+            $species->is_custom = $request->boolean('is_custom')
+                && Species::isCustomName(trim((string) $request->category), trim((string) $request->name));
         }
 
         $species->save();
@@ -529,6 +560,20 @@ class SpeciesController extends Controller
                 'message' => 'No se puede eliminar la especie porque está siendo utilizada en galpones activos.',
                 'errors' => [
                     'galpones' => ['No se puede eliminar la especie porque está siendo utilizada en galpones activos.'],
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Integrity check: same protection for potreros (potreros.species_id also
+        // cascades on delete)
+        $hasPotreros = Potrero::where('species_id', $species->id)->exists();
+
+        if ($hasPotreros) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No se puede eliminar la especie porque está siendo utilizada en potreros activos.',
+                'errors' => [
+                    'potreros' => ['No se puede eliminar la especie porque está siendo utilizada en potreros activos.'],
                 ],
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }

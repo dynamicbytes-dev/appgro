@@ -52,6 +52,7 @@ export const getSectorLabel = (val?: any): string => {
 export const OFFICIAL_FARM_MODULES: SystemModule[] = [
   { id: 2, code: 'species', name: 'Especies', description: 'Gestión de especies y tipos de animales de la granja', is_enabled: true },
   { id: 3, code: 'barns', name: 'Galpones', description: 'Control de galpones, corrales e infraestructura', is_enabled: true },
+  { id: 11, code: 'potreros', name: 'Potreros', description: 'Gestión de potreros y pastoreo (Bovino, Ovino y Caprino)', is_enabled: true },
   { id: 4, code: 'lots', name: 'Lotes', description: 'Gestión de lotes de producción y capacidad de alojamiento', is_enabled: true },
   { id: 5, code: 'activities', name: 'Actividades', description: 'Registro de tareas de campo, alimentación y controles sanitarios', is_enabled: true },
   { id: 10, code: 'inventory', name: 'Inventario', description: 'Control de insumos, stock, vencimientos y movimientos', is_enabled: true },

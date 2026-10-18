@@ -99,7 +99,7 @@ class LotesModuleTest extends TestCase
         }
 
         $this->assertTrue(Schema::hasTable('lote_animals'), 'Table lote_animals must exist.');
-        foreach (['id', 'lote_id', 'identifier', 'breed', 'father_breed', 'mother_breed', 'gender', 'birth_date', 'parity_count', 'teats_count', 'avg_piglets_per_birth', 'status'] as $column) {
+        foreach (['id', 'lote_id', 'identifier', 'name', 'color', 'breed', 'father_breed', 'mother_breed', 'gender', 'birth_date', 'parity_count', 'teats_count', 'avg_piglets_per_birth', 'status'] as $column) {
             $this->assertTrue(
                 Schema::hasColumn('lote_animals', $column),
                 "Column '{$column}' is missing from 'lote_animals' table."
@@ -621,6 +621,127 @@ class LotesModuleTest extends TestCase
                 'quantity' => 5,
             ])
             ->assertStatus(422);
+    }
+
+    public function test_cunicola_rabbit_reproduction_animals_store_name_and_color(): void
+    {
+        [$farm, $admin, $token] = $this->createFarmWithAdmin('Granja Cunícola Reproducción', 'admin_lotes_cunicola@test.com');
+
+        $species = $this->createSpecies($farm, 'cunícola');
+        $galpon = $this->createGalpon($farm, $species, ['purpose' => 'reproducción']);
+
+        $lotId = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/lots', [
+                'galpon_id' => $galpon->id,
+                'species_id' => $species->id,
+                'quantity' => 5,
+            ])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        // Cada conejo de reproducción guarda sus características individuales:
+        // nombre, descripción de color, fecha de nacimiento y cantidad de partos.
+        $response = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/lots/{$lotId}/animals", [
+                'name' => 'Copito',
+                'color' => 'Blanco con manchas negras',
+                'gender' => 'hembra',
+                'birth_date' => '2025-03-10',
+                'parity_count' => 4,
+            ])
+            ->assertStatus(201)
+            ->assertJson([
+                'data' => [
+                    'name' => 'Copito',
+                    'color' => 'Blanco con manchas negras',
+                    'gender' => 'hembra',
+                    'birth_date' => '2025-03-10',
+                    'parity_count' => 4,
+                ],
+            ]);
+
+        $animalId = $response->json('data.id');
+
+        $this->assertDatabaseHas('lote_animals', [
+            'id' => $animalId,
+            'name' => 'Copito',
+            'color' => 'Blanco con manchas negras',
+        ]);
+
+        // Las características individuales se pueden actualizar.
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->putJson("/api/v1/lots/animals/{$animalId}", [
+                'name' => 'Copito II',
+                'color' => 'Gris',
+                'parity_count' => 5,
+            ])
+            ->assertStatus(200)
+            ->assertJson([
+                'data' => [
+                    'name' => 'Copito II',
+                    'color' => 'Gris',
+                    'parity_count' => 5,
+                ],
+            ]);
+
+        $this->assertDatabaseHas('lote_animals', [
+            'id' => $animalId,
+            'name' => 'Copito II',
+            'color' => 'Gris',
+            'parity_count' => 5,
+        ]);
+    }
+
+    public function test_cunicola_reproduction_process_uses_species_terms(): void
+    {
+        [$farm, $admin, $token] = $this->createFarmWithAdmin('Granja Cunícola Proceso', 'admin_lotes_cunicola_proc@test.com');
+
+        $species = $this->createSpecies($farm, 'cunícola');
+        $galpon = $this->createGalpon($farm, $species, ['purpose' => 'reproducción']);
+
+        $lotId = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/lots', [
+                'galpon_id' => $galpon->id,
+                'species_id' => $species->id,
+                'quantity' => 2,
+            ])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        $animalId = $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/lots/{$lotId}/animals", ['gender' => 'hembra'])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        // Un servicio de gestación pasa a la coneja a "gestación".
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/lots/animals/{$animalId}/services", [
+                'service_type' => 'monta',
+                'service_date' => '2026-09-01',
+                'status' => 'gestación',
+            ])
+            ->assertStatus(201);
+
+        // Estando en gestación no puede recibir otro servicio: el mensaje
+        // referencia a la especie (coneja), no a la cerda por defecto.
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/lots/animals/{$animalId}/services", [
+                'service_type' => 'monta',
+                'service_date' => '2026-09-10',
+                'status' => 'gestación',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'La coneja se encuentra actualmente en gestación; debe registrar su destete/parto.');
+
+        // El destete exige total y vivos, con el término propio de la especie.
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson("/api/v1/lots/animals/{$animalId}/services", [
+                'service_type' => 'parto',
+                'service_date' => '2026-10-02',
+                'status' => 'destete',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.total_piglets.0', 'El total de gazapos es obligatorio al registrar el destete/parto.');
     }
 
     public function test_reproduction_animals_and_services_flow(): void
@@ -1619,19 +1740,29 @@ class LotesModuleTest extends TestCase
         $this->assertDatabaseMissing('lots', ['id' => $lotId]);
     }
 
-    public function test_validation_requires_galpon_species_and_quantity(): void
+    public function test_validation_requires_species_and_destination(): void
     {
         [$farm, $admin, $token] = $this->createFarmWithAdmin('Granja Validación', 'admin_lotes_valid@test.com');
 
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->postJson('/api/v1/lots', [])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['galpon_id', 'species_id', 'quantity']);
+            ->assertJsonValidationErrors(['species_id', 'quantity']);
+
+        // Destination is required according to the species' sector
+        $species = $this->createSpecies($farm);
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->postJson('/api/v1/lots', [
+                'species_id' => $species->id,
+                'quantity' => 5,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['galpon_id']);
 
         // Species must belong to the same farm
         $otherFarm = Farm::create(['name' => 'Otra Granja', 'sector' => 'porcino', 'is_active' => true]);
         $otherSpecies = $this->createSpecies($otherFarm);
-        $species = $this->createSpecies($farm);
         $galpon = $this->createGalpon($farm, $species);
 
         $this->withHeader('Authorization', 'Bearer '.$token)

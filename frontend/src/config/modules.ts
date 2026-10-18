@@ -17,6 +17,14 @@ export const SYSTEM_MODULES: Record<ModuleId, ModuleConfig> = {
     category: "operativo",
     roles: ["ADMIN", "ENCARGADO"],
   },
+  potreros: {
+    id: "potreros",
+    name: "Potreros",
+    description: "Gestión de potreros y pastoreo (Bovino, Ovino y Caprino)",
+    icon: "Fence",
+    category: "operativo",
+    roles: ["ADMIN", "ENCARGADO"],
+  },
   lotes: {
     id: "lotes",
     name: "Lotes",
@@ -82,6 +90,7 @@ export const SYSTEM_MODULES: Record<ModuleId, ModuleConfig> = {
 export const MODULE_DISPLAY_ORDER: ModuleId[] = [
   "especies",
   "galpones",
+  "potreros",
   "lotes",
   "inventario",
   "actividades",
@@ -95,6 +104,9 @@ export const MODULE_ALIAS_MAP: Record<string, ModuleId> = {
   specie: "especies",
   barns: "galpones",
   barn: "galpones",
+  potreros: "potreros",
+  potrero: "potreros",
+  paddocks: "potreros",
   lots: "lotes",
   lot: "lotes",
   activities: "actividades",
@@ -130,6 +142,7 @@ export const MODULE_ALIAS_MAP: Record<string, ModuleId> = {
   "6": "analitica",
   "7": "historial",
   "10": "inventario",
+  "11": "potreros",
 };
 
 export const CODE_TO_MODULE_ID: Record<string, number> = {
@@ -142,6 +155,10 @@ export const CODE_TO_MODULE_ID: Record<string, number> = {
   galpones: 3,
   barn: 3,
   galpon: 3,
+
+  potreros: 11,
+  potrero: 11,
+  paddocks: 11,
 
   lots: 4,
   lotes: 4,

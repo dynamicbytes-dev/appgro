@@ -66,6 +66,15 @@ const getPurposesForSector = (sector?: string | null): string[] => {
   return key ? SECTOR_PURPOSES[key] : [];
 };
 
+// Sectores pecuarios habilitados para el módulo de Galpones.
+// Bovino, Ovino y Caprino se gestionarán en el futuro módulo "Potreros".
+const BARN_ALLOWED_SECTORS = ['avicola', 'porcino', 'cunicula'];
+
+const isBarnSectorAllowed = (category?: string | null): boolean => {
+  const key = normalizeSectorKey(category);
+  return !!key && BARN_ALLOWED_SECTORS.includes(key);
+};
+
 export const ShedsView: React.FC = () => {
   const { user, activeFarm, farms: authFarms } = useAuth();
   const { toastSuccess, toastError } = useToast();
@@ -224,10 +233,37 @@ export const ShedsView: React.FC = () => {
         ? selectedBarn.species
         : undefined);
     setFormSector(match?.category || '');
+    // Las especies personalizadas ("Otro") solo admiten el propósito Carne.
+    if ((match as { is_custom?: boolean } | undefined)?.is_custom) {
+      setFormPurpose('Carne');
+    }
   };
 
-  // Opciones de propósito derivadas reactivamente del sector actual
-  const allowedPurposes = useMemo(() => getPurposesForSector(formSector), [formSector]);
+  // Especie seleccionada en el formulario (crear o editar): permite saber
+  // si es personalizada ("Otro") para restringir sus propósitos.
+  const selectedFormSpecies = useMemo<{ is_custom?: boolean } | null>(() => {
+    const found = activeSpeciesList.find((sp) => String(sp.id) === String(formSpeciesId));
+    if (found) return found;
+    if (isEditModalOpen && selectedBarn?.species && String(selectedBarn.species.id) === String(formSpeciesId)) {
+      return selectedBarn.species as { is_custom?: boolean };
+    }
+    return null;
+  }, [activeSpeciesList, formSpeciesId, isEditModalOpen, selectedBarn]);
+  const formSpeciesIsCustom = !!selectedFormSpecies?.is_custom;
+
+  // Opciones de propósito derivadas reactivamente del sector actual.
+  // Las especies personalizadas ("Otro") solo admiten el propósito "Carne".
+  const allowedPurposes = useMemo(
+    () => (formSpeciesIsCustom ? ['Carne'] : getPurposesForSector(formSector)),
+    [formSpeciesIsCustom, formSector]
+  );
+
+  // Especies seleccionables para un galpón: solo Avícola, Porcino y Cunícola.
+  // (Bovino/Ovino/Caprino se gestionarán en el módulo "Potreros").
+  const allowedSpeciesOptions = useMemo(
+    () => activeSpeciesList.filter((sp) => isBarnSectorAllowed(sp.category)),
+    [activeSpeciesList]
+  );
 
   // Cálculo reactivo garantizado de las métricas de galpones
   const computedBarnStats = useMemo(() => {
@@ -859,7 +895,7 @@ export const ShedsView: React.FC = () => {
               className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
             >
               <option value="all">Todas las Especies</option>
-              {activeSpeciesList.map((sp) => (
+              {allowedSpeciesOptions.map((sp) => (
                 <option key={`filter-sp-${sp.id}`} value={String(sp.id)}>
                   {sp.name} ({sp.category})
                 </option>
@@ -1164,41 +1200,18 @@ export const ShedsView: React.FC = () => {
               <option value="" disabled>
                 {isLoadingSpecies
                   ? 'Consultando especies activas...'
-                  : activeSpeciesList.length === 0
-                  ? 'No hay especies activas registradas en la granja'
+                  : allowedSpeciesOptions.length === 0
+                  ? 'No hay especies activas de Avícola, Porcino o Cunícola'
                   : 'Selecciona una especie activa...'}
               </option>
-              {activeSpeciesList.map((sp) => (
+              {allowedSpeciesOptions.map((sp) => (
                 <option key={`create-select-sp-${sp.id}`} value={sp.id}>
                   {sp.name} — Sector: {sp.category}
                 </option>
               ))}
             </select>
             <p className="text-[10px] text-gray-400 mt-1">
-              Solo se listan especies activas pertenecientes a la granja actual.
-            </p>
-          </div>
-
-          {/* Sector Pecuario (Autocompletado) */}
-          <div>
-            <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1 flex items-center justify-between">
-              <span>Sector Pecuario</span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold normal-case">
-                Autocompletado automático
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                readOnly
-                value={formSector ? formSector.toUpperCase() : 'SELECCIONA UNA ESPECIE ARRIBA'}
-                placeholder="Autocompletado según la especie..."
-                className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold cursor-not-allowed select-none text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
-              />
-              <Tag className="w-4 h-4 absolute right-3.5 top-2.5 text-gray-400" />
-            </div>
-            <p className="text-[10px] text-gray-400 mt-1">
-              Sincronizado directamente con la categoría de la especie: bovina, porcina, avícola, ovina, caprina o cunícola.
+              Solo se permiten especies de los sectores Avícola, Porcino y Cunícola. Las demás se gestionarán en el módulo Potreros.
             </p>
           </div>
 
@@ -1225,7 +1238,9 @@ export const ShedsView: React.FC = () => {
               ))}
             </select>
             <p className="text-[10px] text-gray-400 mt-1">
-              {allowedPurposes.length > 0
+              {formSpeciesIsCustom
+                ? 'Especie personalizada: solo se permite el propósito Carne.'
+                : allowedPurposes.length > 0
                 ? `Propósitos permitidos para el sector ${formSector}: ${allowedPurposes.join(', ')}.`
                 : formSector
                 ? `El sector "${formSector}" no tiene propósitos oficiales configurados.`
@@ -1352,7 +1367,7 @@ export const ShedsView: React.FC = () => {
               <option value="" disabled>
                 Selecciona una especie...
               </option>
-              {activeSpeciesList.map((sp) => (
+              {allowedSpeciesOptions.map((sp) => (
                 <option key={`edit-select-sp-${sp.id}`} value={sp.id}>
                   {sp.name} — Sector: {sp.category}
                 </option>
@@ -1365,21 +1380,6 @@ export const ShedsView: React.FC = () => {
                   </option>
                 )}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1 flex items-center justify-between">
-              <span>Sector Pecuario</span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold normal-case">
-                Autocompletado automático
-              </span>
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={formSector ? formSector.toUpperCase() : ''}
-              className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold cursor-not-allowed text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
-            />
           </div>
 
           <div>
@@ -1410,7 +1410,9 @@ export const ShedsView: React.FC = () => {
               )}
             </select>
             <p className="text-[10px] text-gray-400 mt-1">
-              {allowedPurposes.length > 0
+              {formSpeciesIsCustom
+                ? 'Especie personalizada: solo se permite el propósito Carne.'
+                : allowedPurposes.length > 0
                 ? `Propósitos permitidos para el sector ${formSector}: ${allowedPurposes.join(', ')}.`
                 : 'Las opciones dependen del sector pecuario de la especie seleccionada.'}
             </p>

@@ -20,6 +20,7 @@ import { AnalyticsView } from './pages/analytics/AnalyticsView';
 import { HistoryView } from './pages/HistoryView';
 import { SpeciesView } from './pages/SpeciesView';
 import { GalponesView } from './pages/GalponesView';
+import { PotrerosView } from './pages/PotrerosView';
 import { LotesView } from './pages/LotesView';
 import { ModulePage } from './pages/ModulePage';
 import { ForbiddenPage } from './pages/ForbiddenPage';
@@ -131,6 +132,17 @@ export const App: React.FC = () => {
                       element={
                         <ModuleGuard moduleCode="galpones">
                           <GalponesView />
+                        </ModuleGuard>
+                      }
+                    />
+
+                    {/* Potreros Module Dedicated Routes */}
+                    <Route path="/potreros" element={<PotrerosView />} />
+                    <Route
+                      path="/modules/potreros"
+                      element={
+                        <ModuleGuard moduleCode="potreros">
+                          <PotrerosView />
                         </ModuleGuard>
                       }
                     />

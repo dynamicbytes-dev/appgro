@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { lotService } from '../services/lotService';
 import { barnService } from '../services/barnService';
+import { potreroService } from '../services/potreroService';
+import { speciesService } from '../services/speciesService';
 import { farmService } from '../services/farmService';
 import type {
   Lot,
@@ -12,7 +14,9 @@ import type {
   CreateLoteAnimalDTO,
   UpdateLoteAnimalDTO,
   Barn,
+  Potrero,
   Farm,
+  Species,
 } from '../types/auth';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -34,6 +38,7 @@ import {
   PackageCheck,
   Egg,
   PiggyBank,
+  Rabbit,
   RotateCcw,
   Building2,
   ChevronLeft,
@@ -50,6 +55,7 @@ import {
   DollarSign,
   Calendar,
   Warehouse,
+  Fence,
   Layers,
   FileDown,
   Loader2,
@@ -82,9 +88,62 @@ const isGestatingAnimal = (status?: string | null): boolean =>
 const isPorcinoSector = (sector?: string | null): boolean =>
   normalizeKey(sector).startsWith('porcin');
 
+// Sector cunícola (conejos): cunícola, cunicola, cunicultura...
+const isCuniculaSector = (sector?: string | null): boolean =>
+  normalizeKey(sector).startsWith('cunic');
+
+/**
+ * Vocabulario del proceso reproductivo por especie. El ciclo (servicio,
+ * gestación, parto/destete) se expresa con los términos y parámetros
+ * propios de la especie del lote, no con los porcinos por defecto.
+ */
+interface ReproductionVocab {
+  animalSingular: string;
+  animalPlural: string;
+  female: string;
+  offspringSingular: string;
+  offspringPlural: string;
+  gestationDays: number;
+}
+
+const PORCINO_VOCAB: ReproductionVocab = {
+  animalSingular: 'cerdo',
+  animalPlural: 'cerdos',
+  female: 'cerda',
+  offspringSingular: 'lechón',
+  offspringPlural: 'lechones',
+  gestationDays: 114,
+};
+
+const CUNICULA_VOCAB: ReproductionVocab = {
+  animalSingular: 'conejo',
+  animalPlural: 'conejos',
+  female: 'coneja',
+  offspringSingular: 'gazapo',
+  offspringPlural: 'gazapos',
+  gestationDays: 31,
+};
+
+const reproductionVocab = (sector?: string | null): ReproductionVocab =>
+  isCuniculaSector(sector) ? CUNICULA_VOCAB : PORCINO_VOCAB;
+
 // Sector avícola (aves): avícola, avicola, avicultura...
 const isAvicolaSector = (sector?: string | null): boolean =>
   normalizeKey(sector).startsWith('avicol');
+
+// Sectores gestionados por el módulo Potreros (bovino, ovino, caprino).
+const isPotreroSector = (sector?: string | null): boolean => {
+  const key = normalizeKey(sector);
+  return key.startsWith('bovin') || key.startsWith('ovin') || key.startsWith('caprin');
+};
+
+// Sector de un destino (galpón o potrero): prioriza la categoría canónica
+// de la especie asociada.
+const destinationSector = (dest: {
+  category?: string | null;
+  sector?: string | null;
+  species?: { category?: string | null } | null;
+}): string => dest.species?.category || dest.category || dest.sector || '';
 
 const ANIMAL_STATUS_LABELS: Record<string, string> = {
   activo: 'Activo',
@@ -209,6 +268,8 @@ const nextLotCode = (lots: Lot[]): string => {
 interface AnimalFormState {
   /** Identificador estable del formulario (NUNCA se usa el índice como key). */
   formKey: string;
+  name: string;
+  color: string;
   breed: string;
   father_breed: string;
   mother_breed: string;
@@ -224,6 +285,8 @@ let animalFormSeq = 0;
 
 const emptyAnimalForm = (): AnimalFormState => ({
   formKey: `animal-form-${(animalFormSeq += 1)}`,
+  name: '',
+  color: '',
   breed: '',
   father_breed: '',
   mother_breed: '',
@@ -248,6 +311,10 @@ export const LotesView: React.FC = () => {
   /* ------------------------------ Estado ------------------------------ */
   const [lotsList, setLotsList] = useState<Lot[]>([]);
   const [barnsList, setBarnsList] = useState<Barn[]>([]);
+  const [potrerosList, setPotrerosList] = useState<Potrero[]>([]);
+  // Especies ACTIVAS de los sectores de potrero (Bovino/Ovino/Caprino),
+  // usadas para filtrar los potreros disponibles al registrar un lote.
+  const [potreroSpeciesList, setPotreroSpeciesList] = useState<Species[]>([]);
   const [farmsList, setFarmsList] = useState<Farm[]>(() =>
     Array.isArray(authFarms) ? authFarms : []
   );
@@ -322,13 +389,19 @@ export const LotesView: React.FC = () => {
   const weanedAvailableBarns = useMemo(() => {
     if (!weanedSuggestion) return [];
     return barnsList.filter((b) => {
+      if (isPotreroSector(destinationSector(b))) return false;
       const free = Number((b as any).available_capacity) || Math.max(0, Number(b.max_capacity || 0) - Number((b as any).occupied_capacity || 0));
       return free >= weanedSuggestion.piglets;
     });
   }, [barnsList, weanedSuggestion]);
 
   /* --------------------- Formulario: Crear Lote --------------------- */
+  const [formDestType, setFormDestType] = useState<'galpon' | 'potrero'>('galpon');
   const [formGalponId, setFormGalponId] = useState<string>('');
+  const [formPotreroId, setFormPotreroId] = useState<string>('');
+  // Especie activa seleccionada para filtrar los potreros disponibles
+  // (solo aplica cuando el destino es Potrero).
+  const [formPotreroSpeciesId, setFormPotreroSpeciesId] = useState<string>('');
   const [formSpeciesId, setFormSpeciesId] = useState<string>('');
   const [formQuantity, setFormQuantity] = useState<string>('');
   const [formFarmId, setFormFarmId] = useState<string>('');
@@ -366,14 +439,26 @@ export const LotesView: React.FC = () => {
   const [totalPiglets, setTotalPiglets] = useState<string>('');
   const [livePiglets, setLivePiglets] = useState<string>('');
 
-  // Fecha probable de parto: período de gestación de la cerda = 114 días.
-  // La Fecha del Servicio es el único punto de partida (la fecha de
-  // gestación se unificó con ella), por lo que el parto se calcula
-  // reactivamente como servicio + 114 días y es de solo lectura.
-  const GESTATION_DAYS = 114;
+  // Vocabulario del proceso reproductivo según la especie del lote/animal
+  // seleccionado (cerda/coneja, lechón/gazapo, gestación 114 vs 31 días).
+  const selectedLotVocab = useMemo(
+    () =>
+      reproductionVocab(
+        selectedAnimal?.lote?.sector ||
+          selectedAnimal?.lote?.species?.category ||
+          selectedLot?.sector ||
+          selectedLot?.species?.category
+      ),
+    [selectedAnimal, selectedLot]
+  );
+
+  // Fecha probable de parto: gestación propia de la especie (cerda = 114
+  // días; coneja = 31 días). La Fecha del Servicio es el único punto de
+  // partida, por lo que el parto se calcula reactivamente y es de solo
+  // lectura.
   const probableBirthDate = useMemo(
-    () => addDays(serviceDate, GESTATION_DAYS),
-    [serviceDate]
+    () => addDays(serviceDate, selectedLotVocab.gestationDays),
+    [serviceDate, selectedLotVocab]
   );
 
   /* --------------------- Farm scope ---------------------------------- */
@@ -410,9 +495,11 @@ export const LotesView: React.FC = () => {
       if (!silent) setIsLoading(true);
       setErrorMessage(null);
       try {
-        const [lotsRes, barnsRes, statsRes] = await Promise.all([
+        const [lotsRes, barnsRes, potrerosRes, speciesRes, statsRes] = await Promise.all([
           lotService.getAll({ farm_id: effectiveFarmId }),
           barnService.getAll({ farm_id: effectiveFarmId }).catch(() => ({ data: [] })),
+          potreroService.getAll({ farm_id: effectiveFarmId }).catch(() => ({ data: [] })),
+          speciesService.getAll({ farm_id: effectiveFarmId }).catch(() => null),
           lotService.getStats(effectiveFarmId).catch(() => null),
         ]);
 
@@ -431,6 +518,24 @@ export const LotesView: React.FC = () => {
           ? (barnsRes as any).data
           : [];
         setBarnsList(barnRows);
+
+        const potreroRows = Array.isArray((potrerosRes as any)?.data)
+          ? (potrerosRes as any).data
+          : [];
+        setPotrerosList(potreroRows);
+
+        // Especies activas del sector Potrero (Bovino/Ovino/Caprino)
+        const speciesRaw = speciesRes as any;
+        const speciesRows: Species[] = Array.isArray(speciesRaw?.data)
+          ? speciesRaw.data
+          : Array.isArray(speciesRaw)
+          ? speciesRaw
+          : [];
+        setPotreroSpeciesList(
+          speciesRows.filter(
+            (sp) => normalizeIsActive(sp.is_active) && isPotreroSector(sp.category)
+          )
+        );
       } catch (err: any) {
         console.error('Error al cargar lotes:', err);
         const msg =
@@ -453,41 +558,82 @@ export const LotesView: React.FC = () => {
   // Código autogenerado vista previa (el definitivo lo asigna el backend)
   const previewCode = useMemo(() => nextLotCode(lotsList), [lotsList]);
 
-  // Galpón seleccionado en el formulario de creación
+  // Destino seleccionado en el formulario de creación (galpón o potrero).
+  // Las especies de Bovino/Ovino/Caprino se alojan en potreros; el resto
+  // en galpones, por lo que el tipo de destino se elige explícitamente.
   const selectedBarn = useMemo(
     () => barnsList.find((b) => String(b.id) === String(formGalponId)) || null,
     [barnsList, formGalponId]
   );
+  const selectedPotrero = useMemo(
+    () => potrerosList.find((p) => String(p.id) === String(formPotreroId)) || null,
+    [potrerosList, formPotreroId]
+  );
+  // Galpón y potrero comparten estructura (Barn): el destino activo unifica
+  // la lógica de sector, propósito y capacidad.
+  const selectedDestination: Barn | null = useMemo(
+    () => (formDestType === 'potrero' ? selectedPotrero : selectedBarn),
+    [formDestType, selectedBarn, selectedPotrero]
+  );
+  const formDestinationId = formDestType === 'potrero' ? formPotreroId : formGalponId;
 
   const availableCapacity = useMemo(() => {
-    if (!selectedBarn) return 0;
-    if (typeof (selectedBarn as any).available_capacity === 'number') {
-      return (selectedBarn as any).available_capacity;
+    if (!selectedDestination) return 0;
+    if (typeof (selectedDestination as any).available_capacity === 'number') {
+      return (selectedDestination as any).available_capacity;
     }
-    const occupied = Number((selectedBarn as any).occupied_capacity || 0);
-    return Math.max(0, Number(selectedBarn.max_capacity || 0) - occupied);
-  }, [selectedBarn]);
+    const occupied = Number((selectedDestination as any).occupied_capacity || 0);
+    return Math.max(0, Number(selectedDestination.max_capacity || 0) - occupied);
+  }, [selectedDestination]);
 
-  // Solo galpones activos con cupos disponibles pueden recibir lotes
+  const destinationHasCapacity = useCallback(
+    (d: Barn) =>
+      normalizeIsActive(d.is_active) &&
+      (typeof (d as any).available_capacity === 'number'
+        ? (d as any).available_capacity > 0
+        : Number(d.max_capacity || 0) - Number((d as any).occupied_capacity || 0) > 0),
+    []
+  );
+
+  // Solo destinos activos con cupos disponibles y del sector correcto:
+  // galpones (avícola/porcina/cunícola) y potreros (bovina/ovina/caprina).
   const barnsWithCapacity = useMemo(
+    () => barnsList.filter((d) => destinationHasCapacity(d) && !isPotreroSector(destinationSector(d))),
+    [barnsList, destinationHasCapacity]
+  );
+  const potrerosWithCapacity = useMemo(
+    () => potrerosList.filter((d) => destinationHasCapacity(d) && isPotreroSector(destinationSector(d))),
+    [potrerosList, destinationHasCapacity]
+  );
+
+  // Potreros disponibles de la especie activa seleccionada: el selector de
+  // especie filtra los potreros de ese sector (bovina/ovina/caprina).
+  const potrerosWithCapacityForSpecies = useMemo(
     () =>
-      barnsList.filter(
-        (b) =>
-          normalizeIsActive(b.is_active) &&
-          (typeof (b as any).available_capacity === 'number'
-            ? (b as any).available_capacity > 0
-            : Number(b.max_capacity || 0) -
-                Number((b as any).occupied_capacity || 0) >
-              0)
+      potrerosWithCapacity.filter(
+        (p) => String(p.species_id ?? '') === String(formPotreroSpeciesId)
       ),
-    [barnsList]
+    [potrerosWithCapacity, formPotreroSpeciesId]
   );
 
   const formSector = useMemo(
-    () => selectedBarn?.sector || selectedBarn?.category || selectedBarn?.species?.category || '',
-    [selectedBarn]
+    () =>
+      selectedDestination?.sector ||
+      selectedDestination?.category ||
+      selectedDestination?.species?.category ||
+      '',
+    [selectedDestination]
   );
-  const formPurpose = useMemo(() => selectedBarn?.purpose || '', [selectedBarn]);
+  const formPurpose = useMemo(() => selectedDestination?.purpose || '', [selectedDestination]);
+
+  // Vocabulario reproductivo de la especie del destino del formulario.
+  const formVocab = useMemo(() => reproductionVocab(formSector), [formSector]);
+
+  // Vocabulario reproductivo de la especie del lote con destete pendiente.
+  const weanedVocab = useMemo(
+    () => reproductionVocab(weanedSuggestion?.lot?.sector || weanedSuggestion?.lot?.species?.category),
+    [weanedSuggestion]
+  );
 
   const quantityNum = useMemo(() => {
     const n = parseInt(formQuantity, 10);
@@ -495,18 +641,28 @@ export const LotesView: React.FC = () => {
   }, [formQuantity]);
 
   const quantityError = useMemo(() => {
-    if (!formGalponId) return '';
+    if (!formDestinationId) return '';
     if (quantityNum <= 0) return 'Ingrese una cantidad válida de animales.';
     if (quantityNum > availableCapacity) {
-      return `Supera los ${availableCapacity} cupos disponibles de este galpón.`;
+      const label = formDestType === 'potrero' ? 'este potrero' : 'este galpón';
+      return `Supera los ${availableCapacity} cupos disponibles de ${label}.`;
     }
     return '';
-  }, [formGalponId, quantityNum, availableCapacity]);
+  }, [formDestinationId, formDestType, quantityNum, availableCapacity]);
 
-  // Lote porcino de reproducción → formularios individuales por animal
+  // Lote de reproducción (porcino o cunícola) → ficha individual por animal.
+  const formIsPorcino = useMemo(() => isPorcinoSector(formSector), [formSector]);
+  const formIsCunicula = useMemo(() => isCuniculaSector(formSector), [formSector]);
   const isReproductionForm = useMemo(
-    () => isPorcinoSector(formSector) && isReproductionPurpose(formPurpose),
-    [formSector, formPurpose]
+    () => (formIsPorcino || formIsCunicula) && isReproductionPurpose(formPurpose),
+    [formIsPorcino, formIsCunicula, formPurpose]
+  );
+
+  // Sector del lote seleccionado: define la ficha individual mostrada
+  // en el modal de edición de animal (mismo criterio que la creación).
+  const selectedLotIsCunicula = useMemo(
+    () => isCuniculaSector(selectedLot?.sector || selectedLot?.species?.category),
+    [selectedLot]
   );
 
   const shownAnimalForms = useMemo(() => {
@@ -539,6 +695,7 @@ export const LotesView: React.FC = () => {
           lot.sector,
           lot.purpose,
           lot.galpon?.name,
+          lot.potrero?.name,
           lot.species?.name,
         ]
           .filter(Boolean)
@@ -567,18 +724,18 @@ export const LotesView: React.FC = () => {
     }
   }, [currentPage, filteredLots.length, paginatedLots.length]);
 
-  // Cupo ocupado por galpón, derivado de los lotes **activos**
-  // (animales activos + en gestación + destetados). Coincide con
-  // el backend (GalponController@index), que solo suma lotes
-  // activos. Los lotes inactivos (cosechados/vendidos) ya no
-  // ocupan cupo y por eso NO se incluyen. Se recalcula al
-  // instante tras cualquier cambio en la tabla principal.
-  const occupiedByBarnId = useMemo(() => {
+  // Cupo ocupado por destino (galpón o potrero), derivado de los lotes
+  // **activos** (animales activos + en gestación + destetados). Coincide
+  // con el backend, que solo suma lotes activos. Los lotes inactivos
+  // (cosechados/vendidos) ya no ocupan cupo y por eso NO se incluyen.
+  const occupiedByDestination = useMemo(() => {
     const map = new Map<string, number>();
+    const destKey = (lot: Lot) =>
+      lot.potrero_id ? `p:${lot.potrero_id}` : lot.galpon_id ? `g:${lot.galpon_id}` : '';
     lotsList.forEach((l) => {
       if (l.status !== 'activo') return;
-      const key = String(l.galpon_id ?? '');
-      if (!key || key === 'null' || key === 'undefined') return;
+      const key = destKey(l);
+      if (!key) return;
       const occ = Number(l.current_occupancy ?? l.quantity ?? 0);
       if (!Number.isFinite(occ) || occ <= 0) return;
       map.set(key, (map.get(key) ?? 0) + occ);
@@ -586,29 +743,41 @@ export const LotesView: React.FC = () => {
     return map;
   }, [lotsList]);
 
-  // Cupo ocupado de un lote (para la tabla)
-  const barnCapacityOf = useCallback(
+  // Cupo ocupado/capacidad del destino operativo de un lote (para la tabla)
+  const destinationCapacityOf = useCallback(
     (lot: Lot) => {
-      const key = String(lot.galpon_id ?? '');
-      const barn: any = barnsList.find((b) => String(b.id) === key) ?? lot.galpon ?? null;
-      if (!barn) return null;
+      const isPotrero = !!lot.potrero_id;
+      const id = isPotrero ? lot.potrero_id : lot.galpon_id;
+      if (!id) return null;
+      const key = `${isPotrero ? 'p' : 'g'}:${id}`;
+      const list: any[] = isPotrero ? potrerosList : barnsList;
+      const dest: any =
+        list.find((d) => String(d.id) === String(id)) ??
+        (isPotrero ? lot.potrero : lot.galpon) ??
+        null;
+      if (!dest) return null;
       const occupied =
-        occupiedByBarnId.get(key) ??
-        (typeof barn.occupied_capacity === 'number'
-          ? barn.occupied_capacity
+        occupiedByDestination.get(key) ??
+        (typeof dest.occupied_capacity === 'number'
+          ? dest.occupied_capacity
           : Math.max(
               0,
-              Number(barn.max_capacity || 0) - Math.max(0, Number(barn.available_capacity || 0))
+              Number(dest.max_capacity || 0) - Math.max(0, Number(dest.available_capacity || 0))
             ));
-      return { occupied, capacity: Number(barn.max_capacity || 0) };
+      return { occupied, capacity: Number(dest.max_capacity || 0), isPotrero };
     },
-    [barnsList, occupiedByBarnId]
+    [barnsList, potrerosList, occupiedByDestination]
   );
 
   /* ------------------------------ Handlers --------------------------- */
 
   const openCreateModal = () => {
+    setFormDestType(
+      barnsWithCapacity.length > 0 ? 'galpon' : potrerosWithCapacity.length > 0 ? 'potrero' : 'galpon'
+    );
     setFormGalponId('');
+    setFormPotreroId('');
+    setFormPotreroSpeciesId('');
     setFormSpeciesId('');
     setFormQuantity('');
     setFormFarmId(isRoot ? (selectedRootFarmId && selectedRootFarmId !== 'all' ? selectedRootFarmId : '') : '');
@@ -632,10 +801,52 @@ export const LotesView: React.FC = () => {
     setAnimalForms([]);
   };
 
+  const handlePotreroChange = (potreroId: string) => {
+    setFormPotreroId(potreroId);
+    const potrero = potrerosList.find((p) => String(p.id) === String(potreroId));
+    if (potrero) {
+      setFormSpeciesId(String(potrero.species_id ?? ''));
+      // Mantiene la especie del selector sincronizada con el potrero elegido.
+      setFormPotreroSpeciesId(String(potrero.species_id ?? ''));
+    } else {
+      setFormSpeciesId('');
+    }
+    setFormQuantity('');
+    setAnimalForms([]);
+  };
+
+  // El selector de especie (Bovino/Ovino/Caprino) filtra los potreros
+  // disponibles; al cambiarla se reinicia el potrero y la cantidad.
+  const handlePotreroSpeciesChange = (speciesId: string) => {
+    setFormPotreroSpeciesId(speciesId);
+    setFormPotreroId('');
+    setFormSpeciesId('');
+    setFormQuantity('');
+    setAnimalForms([]);
+  };
+
+  const handleDestinationTypeChange = (type: 'galpon' | 'potrero') => {
+    setFormDestType(type);
+    setFormPotreroSpeciesId('');
+    setFormSpeciesId('');
+    setFormQuantity('');
+    setAnimalForms([]);
+  };
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formGalponId) {
-      setErrorMessage('Debe seleccionar un galpón con cupos disponibles.');
+    if (formDestType === 'potrero' && !formPotreroSpeciesId) {
+      setErrorMessage(
+        'Debe seleccionar una especie activa para potreros (Bovino, Ovino o Caprino).'
+      );
+      return;
+    }
+    if (!formDestinationId) {
+      setErrorMessage(
+        formDestType === 'potrero'
+          ? 'Debe seleccionar un potrero con cupos disponibles.'
+          : 'Debe seleccionar un galpón con cupos disponibles.'
+      );
       return;
     }
     if (quantityError) {
@@ -656,7 +867,9 @@ export const LotesView: React.FC = () => {
         : effectiveFarmId;
 
       const created = await lotService.create({
-        galpon_id: Number(formGalponId),
+        ...(formDestType === 'potrero'
+          ? { potrero_id: Number(formPotreroId) }
+          : { galpon_id: Number(formGalponId) }),
         species_id: Number(formSpeciesId),
         quantity: quantityNum,
         purpose: formPurpose || undefined,
@@ -677,6 +890,8 @@ export const LotesView: React.FC = () => {
         for (const af of animalForms) {
           const payload: CreateLoteAnimalDTO = {
             gender: af.gender,
+            name: af.name.trim() || undefined,
+            color: af.color.trim() || undefined,
             breed: af.breed.trim() || undefined,
             father_breed: af.father_breed.trim() || undefined,
             mother_breed: af.mother_breed.trim() || undefined,
@@ -706,7 +921,9 @@ export const LotesView: React.FC = () => {
       setSuccessMessage(`Lote ${created.code} registrado correctamente.`);
       toastSuccess(
         'Registro Exitoso',
-        `El lote "${created.code}" fue creado en el galpón "${safeText(created.galpon?.name || '')}".` +
+        `El lote "${created.code}" fue creado en el ${formDestType === 'potrero' ? 'potrero' : 'galpón'} "${safeText(
+          created.potrero?.name || created.galpon?.name || ''
+        )}".` +
           (isReproductionForm && quantityNum > MAX_ANIMAL_FORMS
             ? ` Se registraron los primeros ${MAX_ANIMAL_FORMS} animales; registre el resto desde "Animales".`
             : '')
@@ -718,6 +935,7 @@ export const LotesView: React.FC = () => {
         err.response?.data?.message ||
         err.response?.data?.errors?.from_service_ids?.[0] ||
         err.response?.data?.errors?.galpon_id?.[0] ||
+        err.response?.data?.errors?.potrero_id?.[0] ||
         err.response?.data?.errors?.quantity?.[0] ||
         err.response?.data?.errors?.species_id?.[0] ||
         'No se pudo registrar el lote. Verifique los datos.';
@@ -732,7 +950,8 @@ export const LotesView: React.FC = () => {
   const openEditModal = (lot: Lot) => {
     setSelectedLot(lot);
     setEditQuantity(String(lot.quantity || 0));
-    setEditPurpose(lot.purpose || '');
+    // Las especies personalizadas solo admiten el propósito Carne.
+    setEditPurpose(lot.species?.is_custom ? 'Carne' : lot.purpose || '');
     setEditStatus(lot.status === 'inactivo' ? 'inactivo' : 'activo');
     setEditInvestmentCost(
       lot.investment_cost !== null && lot.investment_cost !== undefined
@@ -756,7 +975,7 @@ export const LotesView: React.FC = () => {
     try {
       const updated = await lotService.update(selectedLot.id, {
         quantity: qty,
-        purpose: editPurpose.trim() || undefined,
+        purpose: (selectedLot.species?.is_custom ? 'Carne' : editPurpose.trim()) || undefined,
         status: editStatus as 'activo' | 'inactivo',
         // `null` limpia el costo de inversión; número lo actualiza.
         investment_cost:
@@ -1103,11 +1322,11 @@ export const LotesView: React.FC = () => {
 
       toastSuccess(
         'Ficha Técnica Generada',
-        `Se descargó la ficha técnica oficial del cerdo #${animal.identifier || animal.id}.`
+        `Se descargó la ficha técnica oficial del ${selectedLotVocab.animalSingular} #${animal.identifier || animal.id}.`
       );
     } catch (err: any) {
       console.error('Error al exportar ficha porcina:', err);
-      toastError('Error al exportar', err?.message || 'No se pudo generar la ficha técnica del cerdo.');
+      toastError('Error al exportar', err?.message || 'No se pudo generar la ficha técnica del animal.');
     } finally {
       setExportingPigId(null);
     }
@@ -1129,7 +1348,7 @@ export const LotesView: React.FC = () => {
 
       toastSuccess(
         'Fichas Porcinas Generadas',
-        `Se descargaron las fichas individuales de los ${lotAnimals.length} cerdos del lote ${selectedLot.code}.`
+        `Se descargaron las fichas individuales de los ${lotAnimals.length} ${selectedLotVocab.animalPlural} del lote ${selectedLot.code}.`
       );
     } catch (err: any) {
       console.error('Error al exportar fichas porcinas del lote:', err);
@@ -1144,6 +1363,8 @@ export const LotesView: React.FC = () => {
     setSelectedAnimal(animal);
     setAnimalEditForm({
       formKey: `animal-edit-${animal.id}`,
+      name: animal.name || '',
+      color: animal.color || '',
       breed: animal.breed || '',
       father_breed: animal.father_breed || '',
       mother_breed: animal.mother_breed || '',
@@ -1166,6 +1387,8 @@ export const LotesView: React.FC = () => {
       const af = animalEditForm;
       const payload: UpdateLoteAnimalDTO = {
         gender: af.gender,
+        name: af.name.trim() || undefined,
+        color: af.color.trim() || undefined,
         breed: af.breed.trim() || undefined,
         father_breed: af.father_breed.trim() || undefined,
         mother_breed: af.mother_breed.trim() || undefined,
@@ -1181,7 +1404,7 @@ export const LotesView: React.FC = () => {
       const updated = await lotService.updateAnimal(selectedAnimal.id, payload);
       await refreshLotAnimals(selectedAnimal.lote_id);
       setIsAnimalEditModalOpen(false);
-      toastSuccess('Animal Actualizado', `Cerdo ${updated.identifier} editado.`);
+      toastSuccess('Animal Actualizado', `${capitalize(selectedLotVocab.animalSingular)} ${updated.identifier} editado.`);
     } catch (err: any) {
       const msg =
         err.response?.data?.message ||
@@ -1233,7 +1456,7 @@ export const LotesView: React.FC = () => {
       setIsMortalityModalOpen(false);
       toastSuccess(
         'Mortalidad Registrada',
-        `El cerdo ${selectedAnimal.identifier} fue dado de baja por mortalidad. Cantidad del lote y cupo del galpón actualizados.`
+        `El ${selectedLotVocab.animalSingular} ${selectedAnimal.identifier} fue dado de baja por mortalidad. Cantidad del lote y cupo del galpón actualizados.`
       );
     } catch (err: any) {
       const msg = err.response?.data?.message || 'No se pudo registrar la mortalidad.';
@@ -1296,7 +1519,7 @@ export const LotesView: React.FC = () => {
       setIsAnimalSaleModalOpen(false);
       toastSuccess(
         'Venta Registrada',
-        `Cerdo ${updated.identifier} vendido: ${formatDecimal(updated.sale_total_price)}. Estado "cosechado", cantidad del lote y cupo del galpón actualizados.`
+        `${capitalize(selectedLotVocab.animalSingular)} ${updated.identifier} vendido: ${formatDecimal(updated.sale_total_price)}. Estado "cosechado", cantidad del lote y cupo del galpón actualizados.`
       );
     } catch (err: any) {
       const msg =
@@ -1344,16 +1567,16 @@ export const LotesView: React.FC = () => {
       const total = parseInt(totalPiglets, 10);
       const live = parseInt(livePiglets, 10);
       if (Number.isNaN(total) || total <= 0) {
-        setErrorMessage('Ingrese el total de lechones.');
+        setErrorMessage(`Ingrese el total de ${selectedLotVocab.offspringPlural}.`);
         return;
       }
       if (Number.isNaN(live) || live < 0) {
-        setErrorMessage('Ingrese la cantidad de lechones vivos.');
+        setErrorMessage(`Ingrese la cantidad de ${selectedLotVocab.offspringPlural} vivos.`);
         return;
       }
       if (live > total) {
         setErrorMessage(
-          'Los lechones vivos no pueden superar el total de lechones.'
+          `Los ${selectedLotVocab.offspringPlural} vivos no pueden superar el total de ${selectedLotVocab.offspringPlural}.`
         );
         return;
       }
@@ -1400,7 +1623,7 @@ export const LotesView: React.FC = () => {
         await refreshLotAnimals(selectedAnimal.lote_id);
         toastSuccess(
           'Destete / Parto Registrado',
-          `${live} lechones vivos de ${total} para el cerdo ${selectedAnimal.identifier}.`
+          `${live} ${selectedLotVocab.offspringPlural} vivos de ${total} para el ${selectedLotVocab.animalSingular} ${selectedAnimal.identifier}.`
         );
       } catch (err: any) {
         const msg =
@@ -1446,7 +1669,7 @@ export const LotesView: React.FC = () => {
       await refreshLotAnimals(selectedAnimal.lote_id);
       toastSuccess(
         'Servicio Registrado',
-        `${serviceType} registrado para el cerdo ${selectedAnimal.identifier}.`
+        `${serviceType} registrado para el ${selectedLotVocab.animalSingular} ${selectedAnimal.identifier}.`
       );
     } catch (err: any) {
       const msg =
@@ -1482,7 +1705,7 @@ export const LotesView: React.FC = () => {
     if (weanedAvailableBarns.length === 0) {
       toastError(
         'Sin Cupo Disponible',
-        `No hay galpones con suficientes cupos libres para ${piglets} lechones. Coseche otro lote para liberar cupo o elija otro momento.`
+        `No hay galpones con suficientes cupos libres para ${piglets} ${weanedVocab.offspringPlural}. Coseche otro lote para liberar cupo o elija otro momento.`
       );
       return;
     }
@@ -1650,7 +1873,7 @@ export const LotesView: React.FC = () => {
                 diagnosis={`Balance operacional de lotes: ${stats.active_lotes} lotes activos y ${closedLots} cerrados con ${inProd.toLocaleString()} animales vivos en galpones. Rendimiento del propósito: ${totalEggs > 0 ? `${totalGoodEggs.toLocaleString()} huevos comerciales sin mermas (${postureEfficiency} de eficiencia neta) y ${totalBrokenEggs.toLocaleString()} descartes` : `${stats.active_lotes} lotes en ciclo productivo regular`}. Avance de cosecha: ${harvestedLots.length} lotes procesados (${totalHarvestAnimals > 0 ? `${totalHarvestAnimals.toLocaleString()} animales y ` : ''}${totalHarvestWeight.toLocaleString('es-ES', { maximumFractionDigits: 1 })} kg cosechados) con una consolidación financiera total de $${totalCombinedCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} (Cosecha: $${totalHarvestCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })} + Prod. Propósito: $${totalEggCost.toLocaleString('es-ES', { minimumFractionDigits: 2 })}).`}
                 columns={[
                   'Código / Lote',
-                  'Especie / Galpón',
+                  'Especie / Destino',
                   'Propósito',
                   'Población Viva',
                   'Producción del Propósito',
@@ -1733,7 +1956,12 @@ export const LotesView: React.FC = () => {
                       ? 'Cerrado / Cosechado'
                       : 'Cerrado';
 
-                  const especieGalpon = `${safeText(l.species?.name, l.sector || 'General')} • ${safeText(l.galpon?.name, l.galpon_id ? `Galpón #${l.galpon_id}` : 'Sin galpón')}`;
+                  const destLabel = l.potrero_id
+                    ? `Potrero #${l.potrero_id}`
+                    : l.galpon_id
+                    ? `Galpón #${l.galpon_id}`
+                    : 'Sin destino';
+                  const especieGalpon = `${safeText(l.species?.name, l.sector || 'General')} • ${safeText(l.potrero?.name || l.galpon?.name, destLabel)}`;
 
                   return [
                     l.code,
@@ -1977,13 +2205,13 @@ export const LotesView: React.FC = () => {
               <thead>
                 <tr className="bg-[#F9F9F9] dark:bg-[#121816] border-b border-gray-200 dark:border-[#263632] text-[11px] font-bold uppercase text-[#1E1E1E] dark:text-gray-400 tracking-wider">
                   <th className="py-3.5 px-4">Código del Lote</th>
-                  <th className="py-3.5 px-4">Galpón</th>
+                  <th className="py-3.5 px-4">Destino</th>
                   <th className="py-3.5 px-4">Especie</th>
                   <th className="py-3.5 px-4">Sector</th>
                   <th className="py-3.5 px-4">Propósito</th>
                   <th className="py-3.5 px-4 text-right">Cantidad</th>
                   <th className="py-3.5 px-4 text-right">Costo Total de Cosecha</th>
-                  <th className="py-3.5 px-4 text-right">Cupo del Galpón</th>
+                  <th className="py-3.5 px-4 text-right">Cupo del Destino</th>
                   <th className="py-3.5 px-4 text-center">Estado</th>
                   <th className="py-3.5 px-4 text-right">Acciones</th>
                 </tr>
@@ -2018,12 +2246,13 @@ export const LotesView: React.FC = () => {
                   paginatedLots.map((lot) => {
                     const lCode = safeText(lot.code, 'LOT-00000');
                     const lInitial = (lCode.charAt(0) || 'L').toUpperCase();
-                    const barnName = safeText(lot.galpon?.name, 'Sin galpón');
+                    const destName = safeText(lot.potrero?.name || lot.galpon?.name, 'Sin destino');
+                    const isPotreroDest = !!lot.potrero_id;
                     const speciesName = safeText(lot.species?.name, 'Sin especie');
                     const sectorLabel = safeText(lot.sector, 'General');
                     const purposeText = safeText(lot.purpose, '—');
                     const isActive = lot.status === 'activo';
-                    const capacity = barnCapacityOf(lot);
+                    const capacity = destinationCapacityOf(lot);
 
                     return (
                       <tr
@@ -2050,11 +2279,15 @@ export const LotesView: React.FC = () => {
                           </div>
                         </td>
 
-                        {/* Galpón */}
+                        {/* Destino (galpón o potrero) */}
                         <td className="py-3.5 px-4 font-medium text-gray-700 dark:text-gray-300">
                           <div className="flex items-center gap-1.5">
-                            <Warehouse className="w-3.5 h-3.5 text-[#4E9F3D] shrink-0" />
-                            <span className="font-semibold text-xs">{barnName}</span>
+                            {isPotreroDest ? (
+                              <Fence className="w-3.5 h-3.5 text-[#4E9F3D] shrink-0" />
+                            ) : (
+                              <Warehouse className="w-3.5 h-3.5 text-[#4E9F3D] shrink-0" />
+                            )}
+                            <span className="font-semibold text-xs">{destName}</span>
                           </div>
                         </td>
 
@@ -2270,7 +2503,7 @@ export const LotesView: React.FC = () => {
       <Modal
         isOpen={barnSelectionOpen}
         onClose={() => setBarnSelectionOpen(false)}
-        title={`Destino para ${weanedSuggestion?.piglets ?? 0} lechones destetados`}
+        title={`Destino para ${weanedSuggestion?.piglets ?? 0} ${weanedVocab.offspringPlural} destetados`}
         subtitle="Seleccione el galpón de destino (solo galpones con cupo suficiente)"
         maxWidth="lg"
         zIndex={60}
@@ -2327,7 +2560,7 @@ export const LotesView: React.FC = () => {
                 <PiggyBank className="w-8 h-8 mx-auto text-gray-300 dark:text-gray-600 mb-2" />
                 <p className="font-bold text-sm">Sin animales registrados</p>
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  Este lote aún no tiene cerdos individuales registrados.
+                  Este lote aún no tiene animales individuales registrados.
                 </p>
               </div>
             ) : (
@@ -2347,6 +2580,8 @@ export const LotesView: React.FC = () => {
                   </div>
                   {/* Atributos completos del cerdo */}
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {animal.name && <InfoField label="Nombre" value={animal.name} />}
+                    {animal.color && <InfoField label="Descripción de color" value={animal.color} />}
                     <InfoField label="Raza" value={animal.breed} />
                     <InfoField label="Raza del padre" value={animal.father_breed} />
                     <InfoField label="Raza de la madre" value={animal.mother_breed} />
@@ -2362,7 +2597,7 @@ export const LotesView: React.FC = () => {
                       value={Number(animal.teats_count || 0) > 0 ? animal.teats_count : null}
                     />
                     <InfoField
-                      label="Prom. lechones / parto"
+                      label={`Prom. ${selectedLotVocab.offspringPlural} / parto`}
                       value={Number(animal.avg_piglets_per_birth || 0) > 0 ? animal.avg_piglets_per_birth : null}
                     />
                     <InfoField
@@ -2417,88 +2652,143 @@ export const LotesView: React.FC = () => {
             </p>
           </div>
 
-          {/* Selector de Galpón (solo con cupos disponibles) */}
+          {/* Tipo de destino: galpón (aves/cerdos/conejos) o potrero (bovino/ovino/caprino) */}
           <div>
             <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
-              Galpón Destino <span className="text-red-500">*</span>
+              Tipo de Destino <span className="text-red-500">*</span>
             </label>
-            <select
-              value={formGalponId}
-              onChange={(e) => handleBarnChange(e.target.value)}
-              required
-              className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-            >
-              <option value="" disabled>
-                {barnsList.length === 0
-                  ? 'No hay galpones en la granja'
-                  : barnsWithCapacity.length === 0
-                  ? 'No hay galpones con cupos disponibles'
-                  : 'Selecciona un galpón con cupo...'}
-              </option>
-              {barnsWithCapacity.map((b) => {
-                const av =
-                  typeof (b as any).available_capacity === 'number'
-                    ? (b as any).available_capacity
-                    : Math.max(
-                        0,
-                        Number(b.max_capacity || 0) -
-                          Number((b as any).occupied_capacity || 0)
-                      );
-                return (
-                  <option key={`lot-barn-${b.id}`} value={String(b.id)}>
-                    {safeText(b.name)} — {av.toLocaleString()} /{' '}
-                    {Number(b.max_capacity || 0).toLocaleString()} cupos libres
-                  </option>
-                );
-              })}
-            </select>
-            <p className="text-[10px] text-gray-400 mt-1">
-              Solo se listan galpones activos con capacidad disponible. El cupo se valida al guardar.
-            </p>
-          </div>
-
-          {/* Especie (autocompletada desde el galpón) */}
-          <div>
-            <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1 flex items-center justify-between">
-              <span>Especie Asociada</span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold normal-case">
-                Autocompletado
-              </span>
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={
-                selectedBarn?.species?.name
-                  ? `${selectedBarn.species.name}`
-                  : 'SELECCIONA UN GALPÓN ARRIBA'
-              }
-              className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold cursor-not-allowed select-none text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
-            />
-            <p className="text-[10px] text-gray-400 mt-1">
-              Se hereda automáticamente de la especie asignada al galpón.
-            </p>
-          </div>
-
-          {/* Sector (autocompletado, solo lectura) */}
-          <div>
-            <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1 flex items-center justify-between">
-              <span>Sector</span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold normal-case">
-                Autocompletado
-              </span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                readOnly
-                value={formSector ? formSector.toUpperCase() : 'SELECCIONA UN GALPÓN ARRIBA'}
-                className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold cursor-not-allowed select-none text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
-              />
-              <Tag className="w-4 h-4 absolute right-3.5 top-2.5 text-gray-400" />
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleDestinationTypeChange('galpon')}
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-colors ${
+                  formDestType === 'galpon'
+                    ? 'bg-[#1B4D3E] border-[#1B4D3E] text-white'
+                    : 'bg-[#F9F9F9] dark:bg-[#121816] border-gray-200 dark:border-[#263632] text-gray-700 dark:text-gray-200 hover:border-[#4E9F3D]'
+                }`}
+              >
+                <Warehouse className="w-4 h-4" /> Galpón
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDestinationTypeChange('potrero')}
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-xs font-bold transition-colors ${
+                  formDestType === 'potrero'
+                    ? 'bg-[#1B4D3E] border-[#1B4D3E] text-white'
+                    : 'bg-[#F9F9F9] dark:bg-[#121816] border-gray-200 dark:border-[#263632] text-gray-700 dark:text-gray-200 hover:border-[#4E9F3D]'
+                }`}
+              >
+                <Fence className="w-4 h-4" /> Potrero
+              </button>
             </div>
             <p className="text-[10px] text-gray-400 mt-1">
-              Heredado directamente del sector del galpón seleccionado.
+              Galpones: especies Avícola, Porcina y Cunícola. Potreros: Bovino, Ovino y Caprino.
+            </p>
+          </div>
+
+          {/* Especie activa para potreros: filtra los potreros disponibles */}
+          {formDestType === 'potrero' && (
+            <div>
+              <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
+                Especie para Potreros <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formPotreroSpeciesId}
+                onChange={(e) => handlePotreroSpeciesChange(e.target.value)}
+                required
+                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+              >
+                <option value="" disabled>
+                  {potreroSpeciesList.length === 0
+                    ? 'No hay especies activas de Bovino, Ovino o Caprino'
+                    : 'Selecciona una especie activa...'}
+                </option>
+                {potreroSpeciesList.map((sp) => (
+                  <option key={`lot-potrero-species-${sp.id}`} value={String(sp.id)}>
+                    {sp.name} — Sector: {sp.category}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Solo se listan especies activas de los sectores Bovino, Ovino y Caprino.
+              </p>
+            </div>
+          )}
+
+          {/* Selector de destino (solo con cupos disponibles) */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#1E1E1E] dark:text-gray-200 uppercase mb-1">
+              {formDestType === 'potrero' ? 'Potrero Destino' : 'Galpón Destino'} <span className="text-red-500">*</span>
+            </label>
+            {formDestType === 'potrero' ? (
+              <select
+                value={formPotreroId}
+                onChange={(e) => handlePotreroChange(e.target.value)}
+                required
+                disabled={!formPotreroSpeciesId}
+                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+              >
+                <option value="" disabled>
+                  {!formPotreroSpeciesId
+                    ? 'Selecciona primero la especie...'
+                    : potrerosList.length === 0
+                    ? 'No hay potreros en la granja'
+                    : potrerosWithCapacity.length === 0
+                    ? 'No hay potreros con cupos disponibles'
+                    : potrerosWithCapacityForSpecies.length === 0
+                    ? 'No hay potreros de esa especie con cupos disponibles'
+                    : 'Selecciona un potrero con cupo...'}
+                </option>
+                {potrerosWithCapacityForSpecies.map((p) => {
+                  const av =
+                    typeof (p as any).available_capacity === 'number'
+                      ? (p as any).available_capacity
+                      : Math.max(
+                          0,
+                          Number(p.max_capacity || 0) - Number((p as any).occupied_capacity || 0)
+                        );
+                  return (
+                    <option key={`lot-potrero-${p.id}`} value={String(p.id)}>
+                      {safeText(p.name)} — {av.toLocaleString()} /{' '}
+                      {Number(p.max_capacity || 0).toLocaleString()} cupos libres
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
+              <select
+                value={formGalponId}
+                onChange={(e) => handleBarnChange(e.target.value)}
+                required
+                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] cursor-pointer text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+              >
+                <option value="" disabled>
+                  {barnsList.length === 0
+                    ? 'No hay galpones en la granja'
+                    : barnsWithCapacity.length === 0
+                    ? 'No hay galpones con cupos disponibles'
+                    : 'Selecciona un galpón con cupo...'}
+                </option>
+                {barnsWithCapacity.map((b) => {
+                  const av =
+                    typeof (b as any).available_capacity === 'number'
+                      ? (b as any).available_capacity
+                      : Math.max(
+                          0,
+                          Number(b.max_capacity || 0) -
+                            Number((b as any).occupied_capacity || 0)
+                        );
+                  return (
+                    <option key={`lot-barn-${b.id}`} value={String(b.id)}>
+                      {safeText(b.name)} — {av.toLocaleString()} /{' '}
+                      {Number(b.max_capacity || 0).toLocaleString()} cupos libres
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+            <p className="text-[10px] text-gray-400 mt-1">
+              Solo se listan {formDestType === 'potrero' ? 'potreros' : 'galpones'} activos con capacidad disponible. El cupo se valida al guardar.
             </p>
           </div>
 
@@ -2513,11 +2803,11 @@ export const LotesView: React.FC = () => {
             <input
               type="text"
               readOnly
-              value={formPurpose ? formPurpose.toUpperCase() : 'SELECCIONA UN GALPÓN ARRIBA'}
+              value={formPurpose ? formPurpose.toUpperCase() : 'SELECCIONA UN DESTINO ARRIBA'}
               className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#121816]/70 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold cursor-not-allowed select-none text-gray-700 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"
             />
             <p className="text-[10px] text-gray-400 mt-1">
-              Heredado del propósito operativo del galpón (carne, huevos o reproducción).
+              Heredado del propósito operativo del destino (carne, leche, reproducción, etc.).
             </p>
           </div>
 
@@ -2534,22 +2824,22 @@ export const LotesView: React.FC = () => {
               value={formQuantity}
               onChange={(e) => setFormQuantity(e.target.value)}
               required
-              className={`w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border rounded-xl text-xs focus:ring-2 ${ formGalponId && quantityError ? 'border-red-400 focus:ring-red-500' : 'border-gray-200 dark:border-[#263632] focus:ring-[#1B4D3E]' } text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500`}
+              className={`w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border rounded-xl text-xs focus:ring-2 ${ formDestinationId && quantityError ? 'border-red-400 focus:ring-red-500' : 'border-gray-200 dark:border-[#263632] focus:ring-[#1B4D3E]' } text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500`}
             />
-            {formGalponId && quantityNum > 0 && !quantityError && (
+            {formDestinationId && quantityNum > 0 && !quantityError && (
               <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
-                ✓ {quantityNum} animales caben en el galpón. Quedarán {Math.max(0, availableCapacity - quantityNum)} cupos libres.
+                ✓ {quantityNum} animales caben en el {formDestType === 'potrero' ? 'potrero' : 'galpón'}. Quedarán {Math.max(0, availableCapacity - quantityNum)} cupos libres.
               </p>
             )}
-            {formGalponId && quantityError && (
+            {formDestinationId && quantityError && (
               <p className="text-[10px] text-red-600 dark:text-red-400 mt-1 font-semibold flex items-center gap-1">
                 <AlertCircle className="w-3 h-3 shrink-0" />
                 {quantityError}
               </p>
             )}
-            {!formGalponId && (
+            {!formDestinationId && (
               <p className="text-[10px] text-gray-400 mt-1">
-                Validado en tiempo real contra los cupos disponibles del galpón.
+                Validado en tiempo real contra los cupos disponibles del destino.
               </p>
             )}
           </div>
@@ -2598,13 +2888,19 @@ export const LotesView: React.FC = () => {
           {isReproductionForm && shownAnimalForms > 0 && (
             <div className="col-span-1 md:col-span-2">
               <div className="p-3 bg-pink-50 dark:bg-pink-950/30 border border-pink-200 dark:border-pink-800/50 rounded-xl mb-3 flex items-start gap-2">
-                <PiggyBank className="w-4 h-4 text-pink-600 dark:text-pink-400 shrink-0 mt-0.5" />
+                {formIsCunicula ? (
+                  <Rabbit className="w-4 h-4 text-pink-600 dark:text-pink-400 shrink-0 mt-0.5" />
+                ) : (
+                  <PiggyBank className="w-4 h-4 text-pink-600 dark:text-pink-400 shrink-0 mt-0.5" />
+                )}
                 <div>
                   <p className="font-bold text-xs text-pink-800 dark:text-pink-200">
-                    Lote de reproducción porcina — {shownAnimalForms} animales individuales
+                    Lote de reproducción {formIsCunicula ? 'cunícola' : 'porcina'} — {shownAnimalForms} {formVocab.animalPlural} individuales
                   </p>
                   <p className="text-[10px] text-pink-600 dark:text-pink-300 mt-0.5">
-                    Complete la ficha de cada integrante del lote. El identificador de 5 dígitos es automático. Los campos de partos, pezones y promedio de lechones aplican solo a hembras.
+                    {formIsCunicula
+                      ? `Complete la ficha de cada ${formVocab.animalSingular}: nombre, descripción de color, fecha de nacimiento y cantidad de partos. El identificador de 5 dígitos es automático.`
+                      : 'Complete la ficha de cada integrante del lote. El identificador de 5 dígitos es automático. Los campos de partos, pezones y promedio de lechones aplican solo a hembras.'}
                     {quantityNum > MAX_ANIMAL_FORMS && (
                       <span className="block mt-0.5 font-semibold">
                         Mostrando los primeros {MAX_ANIMAL_FORMS}; registre el resto desde "Animales" tras crear el lote.
@@ -2633,175 +2929,290 @@ export const LotesView: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* Raza */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          Raza
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ej. Landrace, Duroc..."
-                          value={af.breed}
-                          onChange={(e) =>
-                            setAnimalForms((prev) =>
-                              prev.map((f, i) =>
-                                i === idx ? { ...f, breed: e.target.value } : f
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                        />
-                      </div>
-
-                      {/* Sexo */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          Sexo <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          value={af.gender}
-                          onChange={(e) =>
-                            setAnimalForms((prev) =>
-                              prev.map((f, i) =>
-                                i === idx
-                                  ? { ...f, gender: e.target.value as 'hembra' | 'macho' }
-                                  : f
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                        >
-                          <option value="hembra">Hembra</option>
-                          <option value="macho">Macho</option>
-                        </select>
-                      </div>
-
-                      {/* Raza padre */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          Raza Padre
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ej. Duroc"
-                          value={af.father_breed}
-                          onChange={(e) =>
-                            setAnimalForms((prev) =>
-                              prev.map((f, i) =>
-                                i === idx ? { ...f, father_breed: e.target.value } : f
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                        />
-                      </div>
-
-                      {/* Raza madre */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          Raza Madre
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Ej. Yorkshire"
-                          value={af.mother_breed}
-                          onChange={(e) =>
-                            setAnimalForms((prev) =>
-                              prev.map((f, i) =>
-                                i === idx ? { ...f, mother_breed: e.target.value } : f
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                        />
-                      </div>
-
-                      {/* Fecha de nacimiento */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                          Fecha de Nacimiento
-                        </label>
-                        <input
-                          type="date"
-                          value={af.birth_date}
-                          onChange={(e) =>
-                            setAnimalForms((prev) =>
-                              prev.map((f, i) =>
-                                i === idx ? { ...f, birth_date: e.target.value } : f
-                              )
-                            )
-                          }
-                          className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                        />
-                      </div>
-
-                      {/* Campos exclusivos para hembras */}
-                      {af.gender === 'hembra' ? (
+                      {formIsCunicula ? (
                         <>
+                          {/* Nombre */}
                           <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                              Partos (paridad)
+                              Nombre
                             </label>
-                            <NumberInput
-                              min="0"
-                              step="1"
-                              placeholder="Ej. 3"
-                              value={af.parity_count}
+                            <input
+                              type="text"
+                              placeholder="Ej. Copito"
+                              value={af.name}
                               onChange={(e) =>
                                 setAnimalForms((prev) =>
                                   prev.map((f, i) =>
-                                    i === idx ? { ...f, parity_count: e.target.value } : f
+                                    i === idx ? { ...f, name: e.target.value } : f
                                   )
                                 )
                               }
                               className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                             />
                           </div>
+
+                          {/* Descripción de color */}
                           <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                              Pezones
+                              Descripción de Color
                             </label>
-                            <NumberInput
-                              min="0"
-                              step="1"
-                              placeholder="Ej. 14"
-                              value={af.teats_count}
+                            <input
+                              type="text"
+                              placeholder="Ej. Blanco con manchas negras"
+                              value={af.color}
                               onChange={(e) =>
                                 setAnimalForms((prev) =>
                                   prev.map((f, i) =>
-                                    i === idx ? { ...f, teats_count: e.target.value } : f
+                                    i === idx ? { ...f, color: e.target.value } : f
                                   )
                                 )
                               }
                               className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                             />
                           </div>
-                          <div className="sm:col-span-2">
+
+                          {/* Sexo */}
+                          <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
-                              Promedio de Lechones por Parto
+                              Sexo <span className="text-red-500">*</span>
                             </label>
-                            <NumberInput
-                              min="0"
-                              step="0.1"
-                              placeholder="Ej. 11.5"
-                              value={af.avg_piglets_per_birth}
+                            <select
+                              value={af.gender}
                               onChange={(e) =>
                                 setAnimalForms((prev) =>
                                   prev.map((f, i) =>
                                     i === idx
-                                      ? { ...f, avg_piglets_per_birth: e.target.value }
+                                      ? { ...f, gender: e.target.value as 'hembra' | 'macho' }
                                       : f
                                   )
                                 )
                               }
                               className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                            >
+                              <option value="hembra">Hembra</option>
+                              <option value="macho">Macho</option>
+                            </select>
+                          </div>
+
+                          {/* Fecha de nacimiento */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                              Fecha de Nacimiento
+                            </label>
+                            <input
+                              type="date"
+                              value={af.birth_date}
+                              onChange={(e) =>
+                                setAnimalForms((prev) =>
+                                  prev.map((f, i) =>
+                                    i === idx ? { ...f, birth_date: e.target.value } : f
+                                  )
+                                )
+                              }
+                              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                             />
                           </div>
+
+                          {/* Cantidad de partos (solo hembras) */}
+                          {af.gender === 'hembra' ? (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                Cantidad de Partos
+                              </label>
+                              <NumberInput
+                                min="0"
+                                step="1"
+                                placeholder="Ej. 3"
+                                value={af.parity_count}
+                                onChange={(e) =>
+                                  setAnimalForms((prev) =>
+                                    prev.map((f, i) =>
+                                      i === idx ? { ...f, parity_count: e.target.value } : f
+                                    )
+                                  )
+                                }
+                                className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                              />
+                            </div>
+                          ) : (
+                            <div className="sm:col-span-2 p-2 bg-gray-50 dark:bg-[#18221F] rounded-lg text-[10px] text-gray-400 italic">
+                              Macho: el campo de cantidad de partos no aplica.
+                            </div>
+                          )}
                         </>
                       ) : (
-                        <div className="sm:col-span-2 p-2 bg-gray-50 dark:bg-[#18221F] rounded-lg text-[10px] text-gray-400 italic">
-                          Macho: campos de paridad, pezones y promedio de lechones no aplican.
-                        </div>
+                        <>
+                          {/* Raza */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                              Raza
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Landrace, Duroc..."
+                              value={af.breed}
+                              onChange={(e) =>
+                                setAnimalForms((prev) =>
+                                  prev.map((f, i) =>
+                                    i === idx ? { ...f, breed: e.target.value } : f
+                                  )
+                                )
+                              }
+                              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                            />
+                          </div>
+
+                          {/* Sexo */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                              Sexo <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={af.gender}
+                              onChange={(e) =>
+                                setAnimalForms((prev) =>
+                                  prev.map((f, i) =>
+                                    i === idx
+                                      ? { ...f, gender: e.target.value as 'hembra' | 'macho' }
+                                      : f
+                                  )
+                                )
+                              }
+                              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                            >
+                              <option value="hembra">Hembra</option>
+                              <option value="macho">Macho</option>
+                            </select>
+                          </div>
+
+                          {/* Raza padre */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                              Raza Padre
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Duroc"
+                              value={af.father_breed}
+                              onChange={(e) =>
+                                setAnimalForms((prev) =>
+                                  prev.map((f, i) =>
+                                    i === idx ? { ...f, father_breed: e.target.value } : f
+                                  )
+                                )
+                              }
+                              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                            />
+                          </div>
+
+                          {/* Raza madre */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                              Raza Madre
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Yorkshire"
+                              value={af.mother_breed}
+                              onChange={(e) =>
+                                setAnimalForms((prev) =>
+                                  prev.map((f, i) =>
+                                    i === idx ? { ...f, mother_breed: e.target.value } : f
+                                  )
+                                )
+                              }
+                              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                            />
+                          </div>
+
+                          {/* Fecha de nacimiento */}
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                              Fecha de Nacimiento
+                            </label>
+                            <input
+                              type="date"
+                              value={af.birth_date}
+                              onChange={(e) =>
+                                setAnimalForms((prev) =>
+                                  prev.map((f, i) =>
+                                    i === idx ? { ...f, birth_date: e.target.value } : f
+                                  )
+                                )
+                              }
+                              className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                            />
+                          </div>
+
+                          {/* Campos exclusivos para hembras */}
+                          {af.gender === 'hembra' ? (
+                            <>
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                  Partos (paridad)
+                                </label>
+                                <NumberInput
+                                  min="0"
+                                  step="1"
+                                  placeholder="Ej. 3"
+                                  value={af.parity_count}
+                                  onChange={(e) =>
+                                    setAnimalForms((prev) =>
+                                      prev.map((f, i) =>
+                                        i === idx ? { ...f, parity_count: e.target.value } : f
+                                      )
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                  Pezones
+                                </label>
+                                <NumberInput
+                                  min="0"
+                                  step="1"
+                                  placeholder="Ej. 14"
+                                  value={af.teats_count}
+                                  onChange={(e) =>
+                                    setAnimalForms((prev) =>
+                                      prev.map((f, i) =>
+                                        i === idx ? { ...f, teats_count: e.target.value } : f
+                                      )
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                                  Promedio de Lechones por Parto
+                                </label>
+                                <NumberInput
+                                  min="0"
+                                  step="0.1"
+                                  placeholder="Ej. 11.5"
+                                  value={af.avg_piglets_per_birth}
+                                  onChange={(e) =>
+                                    setAnimalForms((prev) =>
+                                      prev.map((f, i) =>
+                                        i === idx
+                                          ? { ...f, avg_piglets_per_birth: e.target.value }
+                                          : f
+                                      )
+                                    )
+                                  }
+                                  className="w-full px-3 py-2 bg-[#F9F9F9] dark:bg-[#18221F] border border-gray-200 dark:border-[#263632] rounded-lg text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="sm:col-span-2 p-2 bg-gray-50 dark:bg-[#18221F] rounded-lg text-[10px] text-gray-400 italic">
+                              Macho: campos de paridad, pezones y promedio de lechones no aplican.
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -2824,7 +3235,7 @@ export const LotesView: React.FC = () => {
               type="submit"
               variant="accent"
               size="sm"
-              disabled={isSubmitting || !formGalponId || !!quantityError}
+              disabled={isSubmitting || !formDestinationId || !!quantityError}
               icon={<CheckCircle2 className="w-4 h-4" />}
             >
               {isSubmitting ? 'Guardando...' : 'Registrar Lote'}
@@ -2844,7 +3255,7 @@ export const LotesView: React.FC = () => {
             <div className="col-span-1 md:col-span-2 p-3 bg-gray-50 dark:bg-[#121816] rounded-xl border border-gray-200 dark:border-[#263632] flex items-center justify-between">
               <div>
                 <span className="font-bold text-xs text-[#1E1E1E] dark:text-gray-200 block">
-                  {safeText(selectedLot.galpon?.name, 'Galpón')}
+                  {safeText(selectedLot.potrero?.name || selectedLot.galpon?.name, 'Sin destino')}
                 </span>
                 <span className="text-[10px] text-gray-400">
                   {safeText(selectedLot.sector, 'General')} · {safeText(selectedLot.purpose, '—')}
@@ -2878,11 +3289,19 @@ export const LotesView: React.FC = () => {
               </label>
               <input
                 type="text"
-                value={editPurpose}
+                value={selectedLot?.species?.is_custom ? 'Carne' : editPurpose}
+                readOnly={!!selectedLot?.species?.is_custom}
                 onChange={(e) => setEditPurpose(e.target.value)}
                 placeholder="Ej. Carne, Huevos, Reproducción"
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                className={`w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500${
+                  selectedLot?.species?.is_custom ? ' opacity-70 cursor-not-allowed' : ''
+                }`}
               />
+              <p className="text-[10px] text-gray-400 mt-1">
+                {selectedLot?.species?.is_custom
+                  ? 'Especie personalizada: solo se permite el propósito Carne.'
+                  : 'Propósito operativo del lote (Carne, Huevos, Reproducción, etc.).'}
+              </p>
             </div>
 
             <div className="col-span-1 md:col-span-2">
@@ -2964,10 +3383,14 @@ export const LotesView: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 bg-gray-50 dark:bg-[#121816] rounded-xl border border-gray-200/60 dark:border-[#263632]">
-                <span className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Galpón</span>
+                <span className="text-[10px] text-gray-400 uppercase font-bold block mb-0.5">Destino</span>
                 <span className="font-bold text-xs flex items-center gap-1.5">
-                  <Warehouse className="w-3.5 h-3.5 text-[#4E9F3D]" />
-                  {safeText(selectedLot.galpon?.name, 'Sin galpón')}
+                  {selectedLot.potrero_id ? (
+                    <Fence className="w-3.5 h-3.5 text-[#4E9F3D]" />
+                  ) : (
+                    <Warehouse className="w-3.5 h-3.5 text-[#4E9F3D]" />
+                  )}
+                  {safeText(selectedLot.potrero?.name || selectedLot.galpon?.name, 'Sin destino')}
                 </span>
               </div>
               <div className="p-3 bg-gray-50 dark:bg-[#121816] rounded-xl border border-gray-200/60 dark:border-[#263632]">
@@ -3120,7 +3543,7 @@ export const LotesView: React.FC = () => {
           <form onSubmit={handleHarvestSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div className="col-span-1 md:col-span-2 p-3 bg-gray-50 dark:bg-[#121816] rounded-xl border border-gray-200 dark:border-[#263632] flex items-center justify-between">
               <div>
-                <span className="font-bold text-xs block">{safeText(selectedLot.galpon?.name, 'Galpón')}</span>
+                <span className="font-bold text-xs block">{safeText(selectedLot.potrero?.name || selectedLot.galpon?.name, 'Sin destino')}</span>
                 <span className="text-[10px] text-gray-400">
                   {safeText(selectedLot.sector, 'General')} · {safeText(selectedLot.purpose, '—')}
                 </span>
@@ -3238,7 +3661,7 @@ export const LotesView: React.FC = () => {
           <form onSubmit={handleEggsSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div className="col-span-1 md:col-span-2 p-3 bg-gray-50 dark:bg-[#121816] rounded-xl border border-gray-200 dark:border-[#263632] flex items-center justify-between">
               <div>
-                <span className="font-bold text-xs block">{safeText(selectedLot.galpon?.name, 'Galpón')}</span>
+                <span className="font-bold text-xs block">{safeText(selectedLot.potrero?.name || selectedLot.galpon?.name, 'Sin destino')}</span>
                 <span className="text-[10px] text-gray-400">
                   Acumulado: {Number(selectedLot.total_eggs || 0).toLocaleString()} huevos · Rotos: {Number(selectedLot.broken_eggs || 0).toLocaleString()}
                 </span>
@@ -3333,12 +3756,12 @@ export const LotesView: React.FC = () => {
         )}
       </Modal>
 
-      {/* 13. Modal: Animales Individuales (porcinos de reproducción) */}
+      {/* 13. Modal: Animales Individuales (porcinos y conejos de reproducción) */}
       <Modal
         isOpen={isAnimalsModalOpen}
         onClose={() => setIsAnimalsModalOpen(false)}
         title={`Animales del Lote ${selectedLot ? safeText(selectedLot.code) : ''}`}
-        subtitle="Registro individual de cerdos con acciones por animal"
+        subtitle="Registro individual de animales con acciones por animal"
         maxWidth="2xl"
       >
         {selectedLot && (
@@ -3350,10 +3773,10 @@ export const LotesView: React.FC = () => {
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <div>
                     <p className="font-bold text-emerald-800 dark:text-emerald-200">
-                      Hay {weanedSuggestion.piglets} lechones destetados pendientes de asignar a un galpón
+                      Hay {weanedSuggestion.piglets} {selectedLotVocab.offspringPlural} destetados pendientes de asignar a un galpón
                     </p>
                     <p className="text-[10px] text-emerald-600 dark:text-emerald-300 mt-0.5">
-                      La alerta permanece —incluso si recargas la página— hasta crear el lote de lechones con la cantidad exacta de vivos.
+                      La alerta permanece —incluso si recargas la página— hasta crear el lote de {selectedLotVocab.offspringPlural} con la cantidad exacta de vivos.
                     </p>
                   </div>
                 </div>
@@ -3371,7 +3794,7 @@ export const LotesView: React.FC = () => {
 
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="text-[11px] text-gray-500">
-                <strong>{lotAnimals.length}</strong> cerdos registrados en este lote
+                <strong>{lotAnimals.length}</strong> {selectedLotVocab.animalPlural} registrados en este lote
               </span>
               <div className="flex items-center gap-2">
                 <Button
@@ -3379,7 +3802,7 @@ export const LotesView: React.FC = () => {
                   size="sm"
                   onClick={handleExportAllPigsPdf}
                   disabled={isExportingPigPdf || lotAnimals.length === 0}
-                  title="Exportar fichas técnicas de todos los cerdos en PDF"
+                  title="Exportar fichas técnicas de todos los animales en PDF"
                   icon={
                     isExportingPigPdf ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -3413,7 +3836,7 @@ export const LotesView: React.FC = () => {
                   <PiggyBank className="w-8 h-8 mx-auto text-gray-300 dark:text-gray-600 mb-2" />
                   <p className="font-bold text-sm">Sin animales registrados</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">
-                    Registre los cerdos individualmente desde "Nuevo Lote" o aquí.
+                    Registre los animales individualmente desde "Nuevo Lote" o aquí.
                   </p>
                 </div>
               ) : (
@@ -3448,14 +3871,20 @@ export const LotesView: React.FC = () => {
                               <span className="font-mono font-bold text-[#1B4D3E] dark:text-[#4E9F3D]">
                                 {safeText(animal.identifier)}
                               </span>
+                              {animal.name && (
+                                <span className="block text-[9px] text-gray-500 dark:text-gray-400 font-semibold">
+                                  {safeText(animal.name)}
+                                </span>
+                              )}
                               {animal.gender === 'hembra' && Number(animal.parity_count || 0) > 0 && (
                                 <span className="block text-[9px] text-gray-400 font-normal">
-                                  {animal.parity_count} partos · {animal.teats_count} pezones
+                                  {animal.parity_count} partos
+                                  {Number(animal.teats_count || 0) > 0 ? ` · ${animal.teats_count} pezones` : ''}
                                 </span>
                               )}
                             </td>
                             <td className="py-2.5 px-3 text-gray-700 dark:text-gray-300">
-                              {safeText(animal.breed, '—')}
+                              {safeText(animal.color || animal.breed, '—')}
                             </td>
                             <td className="py-2.5 px-3 capitalize text-gray-700 dark:text-gray-300">
                               {safeText(animal.gender)}
@@ -3518,8 +3947,8 @@ export const LotesView: React.FC = () => {
                                     onClick={() => openServiceModal(animal)}
                                     title={
                                       animalIsGestating
-                                        ? 'Registrar Destete / Parto — la cerda está en gestación y no puede recibir otro servicio'
-                                        : 'Registrar Servicio (inseminación / monta) — inicia la gestación de la cerda'
+                                        ? `Registrar Destete / Parto — la ${selectedLotVocab.female} está en gestación y no puede recibir otro servicio`
+                                        : `Registrar Servicio (inseminación / monta) — inicia la gestación de la ${selectedLotVocab.female}`
                                     }
                                     className={`p-1.5 text-gray-400 dark:hover:bg-[#263632] rounded-lg transition-colors cursor-pointer ${
                                       animalIsGestating
@@ -3528,7 +3957,11 @@ export const LotesView: React.FC = () => {
                                     }`}
                                   >
                                     {animalIsGestating ? (
-                                      <PigletHead className="w-4 h-4" />
+                                      selectedLotIsCunicula ? (
+                                        <Rabbit className="w-4 h-4" />
+                                      ) : (
+                                        <PigletHead className="w-4 h-4" />
+                                      )
                                     ) : (
                                       <HeartPulse className="w-4 h-4" />
                                     )}
@@ -3581,7 +4014,7 @@ export const LotesView: React.FC = () => {
       <Modal
         isOpen={isAnimalEditModalOpen}
         onClose={() => setIsAnimalEditModalOpen(false)}
-        title={`Editar Cerdo ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`}
+        title={`Editar ${capitalize(selectedLotVocab.animalSingular)} ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`}
         maxWidth="lg"
       >
         {selectedAnimal && (
@@ -3593,94 +4026,159 @@ export const LotesView: React.FC = () => {
               </span>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-bold uppercase mb-1">Raza</label>
-              <input
-                type="text"
-                value={animalEditForm.breed}
-                onChange={(e) => setAnimalEditForm((f) => ({ ...f, breed: e.target.value }))}
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold uppercase mb-1">
-                Sexo <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={animalEditForm.gender}
-                onChange={(e) =>
-                  setAnimalEditForm((f) => ({ ...f, gender: e.target.value as 'hembra' | 'macho' }))
-                }
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-              >
-                <option value="hembra">Hembra</option>
-                <option value="macho">Macho</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold uppercase mb-1">Raza Padre</label>
-              <input
-                type="text"
-                value={animalEditForm.father_breed}
-                onChange={(e) => setAnimalEditForm((f) => ({ ...f, father_breed: e.target.value }))}
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold uppercase mb-1">Raza Madre</label>
-              <input
-                type="text"
-                value={animalEditForm.mother_breed}
-                onChange={(e) => setAnimalEditForm((f) => ({ ...f, mother_breed: e.target.value }))}
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold uppercase mb-1">Fecha de Nacimiento</label>
-              <input
-                type="date"
-                value={animalEditForm.birth_date}
-                onChange={(e) => setAnimalEditForm((f) => ({ ...f, birth_date: e.target.value }))}
-                className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-              />
-            </div>
-
-            {animalEditForm.gender === 'hembra' && (
+            {selectedLotIsCunicula ? (
               <>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase mb-1">Partos (paridad)</label>
-                  <NumberInput
-                    min="0"
-                    step="1"
-                    value={animalEditForm.parity_count}
-                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, parity_count: e.target.value }))}
+                  <label className="block text-[11px] font-bold uppercase mb-1">Nombre</label>
+                  <input
+                    type="text"
+                    value={animalEditForm.name}
+                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, name: e.target.value }))}
                     className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-[11px] font-bold uppercase mb-1">Pezones</label>
-                  <NumberInput
-                    min="0"
-                    step="1"
-                    value={animalEditForm.teats_count}
-                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, teats_count: e.target.value }))}
+                  <label className="block text-[11px] font-bold uppercase mb-1">Descripción de Color</label>
+                  <input
+                    type="text"
+                    value={animalEditForm.color}
+                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, color: e.target.value }))}
                     className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                   />
                 </div>
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-[11px] font-bold uppercase mb-1">Promedio de Lechones por Parto</label>
-                  <NumberInput
-                    min="0"
-                    step="0.1"
-                    value={animalEditForm.avg_piglets_per_birth}
-                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, avg_piglets_per_birth: e.target.value }))}
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase mb-1">
+                    Sexo <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={animalEditForm.gender}
+                    onChange={(e) =>
+                      setAnimalEditForm((f) => ({ ...f, gender: e.target.value as 'hembra' | 'macho' }))
+                    }
+                    className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                  >
+                    <option value="hembra">Hembra</option>
+                    <option value="macho">Macho</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase mb-1">Fecha de Nacimiento</label>
+                  <input
+                    type="date"
+                    value={animalEditForm.birth_date}
+                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, birth_date: e.target.value }))}
                     className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
                   />
                 </div>
+
+                {animalEditForm.gender === 'hembra' && (
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase mb-1">Cantidad de Partos</label>
+                    <NumberInput
+                      min="0"
+                      step="1"
+                      value={animalEditForm.parity_count}
+                      onChange={(e) => setAnimalEditForm((f) => ({ ...f, parity_count: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase mb-1">Raza</label>
+                  <input
+                    type="text"
+                    value={animalEditForm.breed}
+                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, breed: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase mb-1">
+                    Sexo <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={animalEditForm.gender}
+                    onChange={(e) =>
+                      setAnimalEditForm((f) => ({ ...f, gender: e.target.value as 'hembra' | 'macho' }))
+                    }
+                    className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                  >
+                    <option value="hembra">Hembra</option>
+                    <option value="macho">Macho</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase mb-1">Raza Padre</label>
+                  <input
+                    type="text"
+                    value={animalEditForm.father_breed}
+                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, father_breed: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase mb-1">Raza Madre</label>
+                  <input
+                    type="text"
+                    value={animalEditForm.mother_breed}
+                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, mother_breed: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase mb-1">Fecha de Nacimiento</label>
+                  <input
+                    type="date"
+                    value={animalEditForm.birth_date}
+                    onChange={(e) => setAnimalEditForm((f) => ({ ...f, birth_date: e.target.value }))}
+                    className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                  />
+                </div>
+
+                {animalEditForm.gender === 'hembra' && (
+                  <>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase mb-1">Partos (paridad)</label>
+                      <NumberInput
+                        min="0"
+                        step="1"
+                        value={animalEditForm.parity_count}
+                        onChange={(e) => setAnimalEditForm((f) => ({ ...f, parity_count: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase mb-1">Pezones</label>
+                      <NumberInput
+                        min="0"
+                        step="1"
+                        value={animalEditForm.teats_count}
+                        onChange={(e) => setAnimalEditForm((f) => ({ ...f, teats_count: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                      />
+                    </div>
+                    <div className="col-span-1 md:col-span-2">
+                      <label className="block text-[11px] font-bold uppercase mb-1">Promedio de Lechones por Parto</label>
+                      <NumberInput
+                        min="0"
+                        step="0.1"
+                        value={animalEditForm.avg_piglets_per_birth}
+                        onChange={(e) => setAnimalEditForm((f) => ({ ...f, avg_piglets_per_birth: e.target.value }))}
+                        className="w-full px-3.5 py-2.5 bg-[#F9F9F9] dark:bg-[#121816] border border-gray-200 dark:border-[#263632] rounded-xl text-xs focus:ring-2 focus:ring-[#1B4D3E] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                      />
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -3700,7 +4198,7 @@ export const LotesView: React.FC = () => {
       <Modal
         isOpen={isAnimalSaleModalOpen}
         onClose={() => setIsAnimalSaleModalOpen(false)}
-        title={`Cosecha / Venta — Cerdo ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`}
+        title={`Cosecha / Venta — ${capitalize(selectedLotVocab.animalSingular)} ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`}
         subtitle="Registra peso, precio y marca el animal como cosechado"
       >
         {selectedAnimal && (
@@ -3777,7 +4275,7 @@ export const LotesView: React.FC = () => {
               <Skull className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold text-red-800 dark:text-red-200">
-                  ¿Registrar la baja del cerdo {safeText(selectedAnimal.identifier)}?
+                  ¿Registrar la baja del {selectedLotVocab.animalSingular} {safeText(selectedAnimal.identifier)}?
                 </p>
                 <p className="text-red-700 dark:text-red-300 mt-1 leading-relaxed">
                   El animal pasará a estado <strong>"Muerto"</strong> por enfermedad o accidente y dejará de aparecer en la producción activa del lote.
@@ -3803,12 +4301,12 @@ export const LotesView: React.FC = () => {
         onClose={() => setIsServiceModalOpen(false)}
         title={
           serviceMode === 'destete'
-            ? `Destete / Parto — Cerdo ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`
-            : `Servicio Reproductivo — Cerdo ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`
+            ? `Destete / Parto — ${capitalize(selectedLotVocab.animalSingular)} ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`
+            : `Servicio Reproductivo — ${capitalize(selectedLotVocab.animalSingular)} ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`
         }
         subtitle={
           serviceMode === 'destete'
-            ? 'Registro del parto y los lechones destetados'
+            ? `Registro del parto y los ${selectedLotVocab.offspringPlural} destetados`
             : 'Inseminación o monta con cálculo automático de gestación'
         }
         maxWidth="lg"
@@ -3834,7 +4332,7 @@ export const LotesView: React.FC = () => {
                 {/* Total de lechones */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase mb-1">
-                    Total de Lechones <span className="text-red-500">*</span>
+                    Total de {capitalize(selectedLotVocab.offspringPlural)} <span className="text-red-500">*</span>
                   </label>
                   <NumberInput
                     min="1"
@@ -3850,7 +4348,7 @@ export const LotesView: React.FC = () => {
                 {/* Lechones vivos */}
                 <div>
                   <label className="block text-[11px] font-bold uppercase mb-1">
-                    Lechones Vivos <span className="text-red-500">*</span>
+                    {capitalize(selectedLotVocab.offspringPlural)} Vivos <span className="text-red-500">*</span>
                   </label>
                   <NumberInput
                     min="0"
@@ -3863,7 +4361,7 @@ export const LotesView: React.FC = () => {
                   />
                   {!Number.isNaN(parseInt(livePiglets, 10)) && parseInt(livePiglets, 10) > 0 && (
                     <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
-                      ✓ Al guardar, la cerda vuelve a "Activo" y podrá abrir un nuevo lote con {livePiglets} lechones destetados (si hay cupo).
+                      ✓ Al guardar, la {selectedLotVocab.female} vuelve a "Activo" y podrá abrir un nuevo lote con {livePiglets} {selectedLotVocab.offspringPlural} destetados (si hay cupo).
                     </p>
                   )}
                 </div>
@@ -3904,7 +4402,7 @@ export const LotesView: React.FC = () => {
                   <label className="block text-[11px] font-bold uppercase mb-1">
                     Fecha Probable de Parto
                     <span className="text-[9px] font-normal text-gray-400 ml-1.5">
-                      (+{GESTATION_DAYS} días, automática)
+                      (+{selectedLotVocab.gestationDays} días, automática)
                     </span>
                   </label>
                   <input
@@ -3914,7 +4412,7 @@ export const LotesView: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-gray-100 dark:bg-[#263632]/60 border border-gray-200 dark:border-[#263632] rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-200 cursor-not-allowed select-none"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">
-                    Se calcula automáticamente desde la fecha del servicio sumando {GESTATION_DAYS} días.
+                    Se calcula automáticamente desde la fecha del servicio sumando {selectedLotVocab.gestationDays} días.
                   </p>
                 </div>
               </>
@@ -3924,7 +4422,7 @@ export const LotesView: React.FC = () => {
               <Button type="button" variant="outline" size="sm" onClick={() => setIsServiceModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="accent" size="sm" disabled={isSubmitting} icon={serviceMode === 'destete' ? <PigletHead className="w-4 h-4" /> : <HeartPulse className="w-4 h-4" />}>
+              <Button type="submit" variant="accent" size="sm" disabled={isSubmitting} icon={serviceMode === 'destete' ? (selectedLotIsCunicula ? <Rabbit className="w-4 h-4" /> : <PigletHead className="w-4 h-4" />) : <HeartPulse className="w-4 h-4" />}>
                 {isSubmitting
                   ? 'Guardando...'
                   : serviceMode === 'destete'
@@ -3940,7 +4438,7 @@ export const LotesView: React.FC = () => {
       <Modal
         isOpen={isServiceHistoryOpen}
         onClose={() => setIsServiceHistoryOpen(false)}
-        title={`Historial de Servicios — Cerdo ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`}
+        title={`Historial de Servicios — ${capitalize(selectedLotVocab.animalSingular)} ${selectedAnimal ? safeText(selectedAnimal.identifier) : ''}`}
       >
         <div className="space-y-3 text-xs">
           {animalServices.length === 0 ? (
@@ -3987,7 +4485,7 @@ export const LotesView: React.FC = () => {
                     {Number(svc.total_piglets || 0) > 0 && (
                       <span className="flex items-center gap-1">
                         <PiggyBank className="w-3 h-3 text-gray-400" />
-                        Lechones: {svc.total_piglets} ({svc.live_piglets} vivos)
+                        {capitalize(selectedLotVocab.offspringPlural)}: {svc.total_piglets} ({svc.live_piglets} vivos)
                       </span>
                     )}
                   </div>
