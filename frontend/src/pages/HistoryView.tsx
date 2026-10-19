@@ -146,7 +146,14 @@ export const HistoryView: React.FC = () => {
             date_to: dateTo || undefined,
             farm_id: farmIdToQuery,
           }),
-          historyService.getStats({ farm_id: farmIdToQuery }).catch((err) => {
+          historyService.getStats({
+            farm_id: farmIdToQuery,
+            module: moduleFilter !== 'all' ? moduleFilter : undefined,
+            action: actionFilter !== 'all' ? actionFilter : undefined,
+            date_from: dateFrom || undefined,
+            date_to: dateTo || undefined,
+            search: searchTerm.trim() || undefined,
+          }).catch((err) => {
             console.warn('Endpoint /history/stats no respondió, usando datos de respaldo:', err);
             return null;
           }),

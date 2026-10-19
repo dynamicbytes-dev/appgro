@@ -4,8 +4,8 @@ import { safeText } from '../../utils/safeText';
 interface CardProps {
   children: React.ReactNode;
   className?: string;
-  title?: any;
-  subtitle?: any;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
   action?: React.ReactNode;
 }
 
@@ -16,8 +16,8 @@ export const Card: React.FC<CardProps> = ({
   subtitle,
   action,
 }) => {
-  const safeTitle = safeText(title);
-  const safeSubtitle = safeText(subtitle);
+  const safeTitle = title ? safeText(title) : '';
+  const safeSubtitle = subtitle ? safeText(subtitle) : '';
 
   return (
     <div className={`bg-white dark:bg-[#18221F] rounded-2xl border border-gray-200/80 dark:border-[#263632] shadow-sm hover:shadow-md transition-shadow p-6 ${className}`}>

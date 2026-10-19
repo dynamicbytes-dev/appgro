@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Modal } from '../components/ui/Modal';
+import { StatCard } from '../components/ui/StatCard';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { safeText } from '../utils/safeText';
@@ -28,6 +29,7 @@ export const RootDashboard: React.FC = () => {
   const [admins, setAdmins] = useState<User[]>([]);
   const [farmsMetric, setFarmsMetric] = useState<{ total: number; active: number }>({ total: 0, active: 0 });
   const [adminsMetric, setAdminsMetric] = useState<{ total: number; active: number }>({ total: 0, active: 0 });
+  const [modulesMetric, setModulesMetric] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Quick Farm Create Modal
@@ -52,9 +54,6 @@ export const RootDashboard: React.FC = () => {
           return [];
         }),
       ]);
-
-      console.log('ESTADÍSTICAS ROOT:', farmRes);
-      console.log('ESTADÍSTICAS ROOT (ADMINS):', adminRes);
 
       // Extract farm list and count metrics
       const farmList: Farm[] = Array.isArray(farmRes)
@@ -131,6 +130,8 @@ export const RootDashboard: React.FC = () => {
         total: statsData?.total_admins ?? Math.max(totalAdmins, adminList.length),
         active: statsData?.active_admins ?? activeAdmins,
       });
+
+      setModulesMetric(statsData?.total_modules ?? 0);
     } catch (e) {
       console.error('Error loading Root dashboard data', e);
     } finally {
@@ -201,54 +202,29 @@ export const RootDashboard: React.FC = () => {
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        
-        <Card className="p-5 border-l-4 border-l-amber-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Granjas Totales</p>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-gray-100 mt-1">
-                {farmsMetric.total || farms.length}
-              </h3>
-              <p className="text-[11px] text-emerald-600 mt-1 font-semibold">
-                {farmsMetric.active} Activas
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600">
-              <Building2 className="w-6 h-6" />
-            </div>
-          </div>
-        </Card>
+        <StatCard
+          label="Granjas Totales"
+          value={farmsMetric.total || farms.length}
+          hint={`${farmsMetric.active} Activas`}
+          icon={<Building2 className="w-6 h-6" />}
+          tone="amber"
+        />
 
-        <Card className="p-5 border-l-4 border-l-[#4E9F3D]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Administradores</p>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-gray-100 mt-1">
-                {adminsMetric.total || admins.length}
-              </h3>
-              <p className="text-[11px] text-emerald-600 mt-1 font-semibold">
-                {adminsMetric.active} Cuentas Activas
-              </p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-[#4E9F3D]">
-              <Users className="w-6 h-6" />
-            </div>
-          </div>
-        </Card>
+        <StatCard
+          label="Administradores"
+          value={adminsMetric.total || admins.length}
+          hint={`${adminsMetric.active} Cuentas Activas`}
+          icon={<Users className="w-6 h-6" />}
+          tone="emerald"
+        />
 
-        <Card className="p-5 border-l-4 border-l-blue-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Módulos del Sistema</p>
-              <h3 className="text-2xl font-black text-gray-900 dark:text-gray-100 mt-1">6</h3>
-              <p className="text-[11px] text-blue-600 mt-1 font-semibold">Configuración dinámicas farm_modules</p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600">
-              <Layers className="w-6 h-6" />
-            </div>
-          </div>
-        </Card>
-
+        <StatCard
+          label="Módulos del Sistema"
+          value={modulesMetric}
+          hint="Catálogo configurable vía farm_modules"
+          icon={<Layers className="w-6 h-6" />}
+          tone="blue"
+        />
       </div>
 
       {/* Quick Action Button & Table Overview */}

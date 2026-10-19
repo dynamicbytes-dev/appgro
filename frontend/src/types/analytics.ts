@@ -16,7 +16,7 @@ export interface AnalyticsSummary {
   total_cost: number;
   total_revenue: number;
   profit: number;
-  margin_percent: number;
+  margin_percent: number | null;
   occupancy_percent: number;
   capacity: number;
   occupied: number;
@@ -97,7 +97,7 @@ export interface AnalyticsFinancial {
   costs: FinancialCosts;
   revenue: FinancialRevenue;
   profit: number;
-  margin_percent: number;
+  margin_percent: number | null;
   by_sector: FinancialSector[];
   by_lot: FinancialLot[];
   inputs_top: FinancialInput[];

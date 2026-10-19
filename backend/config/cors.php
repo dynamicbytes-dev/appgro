@@ -15,15 +15,21 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'v1/*', '*'],
+    'paths' => ['api/*', 'v1/*'],
 
-    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', '*'],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
-    'allowed_origins' => ['http://localhost:5175', 'http://localhost:5173', 'http://localhost:3000', '*'],
+    'allowed_origins' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env(
+            'CORS_ALLOWED_ORIGINS',
+            'http://localhost:5175,http://localhost:5173,http://localhost:3000'
+        ))
+    ))),
 
-    'allowed_origins_patterns' => ['#^http://localhost:\d+$#'],
+    'allowed_origins_patterns' => ['#^http://localhost:\d+$#', '#^http://127\.0\.0\.1:\d+$#'],
 
-    'allowed_headers' => ['Authorization', 'Content-Type', 'X-Requested-With', 'Accept', 'Origin', '*'],
+    'allowed_headers' => ['Authorization', 'Content-Type', 'X-Requested-With', 'Accept', 'Origin'],
 
     'exposed_headers' => ['Authorization'],
 

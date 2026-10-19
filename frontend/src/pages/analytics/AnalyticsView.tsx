@@ -3,6 +3,7 @@ import { BarChart3, TrendingUp, Users, Warehouse } from 'lucide-react';
 import { ExportKpiPdfButton } from '../../components/common/ExportKpiPdfButton';
 import { useAuth } from '../../context/AuthContext';
 import { farmService } from '../../services/farmService';
+import { analyticsService } from '../../services/analyticsService';
 import type { Farm } from '../../types/auth';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { AnalyticsExecutiveTab } from './AnalyticsExecutiveTab';
@@ -87,6 +88,54 @@ export const AnalyticsView: React.FC = () => {
       : activeFarmObj?.name || 'Granja Seleccionada'
     : activeFarm?.name || 'Granja Activa';
 
+  /**
+   * Carga los KPIs reales del período desde el endpoint ejecutivo y los adapta
+   * al formato del PDF (label/value/status -> title/value/tone).
+   */
+  const buildAnalyticsPdfData = async () => {
+    const report = await analyticsService.getExecutiveKpis(
+      'analitica',
+      isRoot ? rootFarmFilter : farmId
+    );
+    const payload = report?.data?.kpis ? report.data : report;
+    const rawKpis: any[] = Array.isArray(payload?.kpis) ? payload.kpis : [];
+
+    const toneFromStatus: Record<string, 'emerald' | 'amber' | 'red' | 'slate'> = {
+      success: 'emerald',
+      warning: 'amber',
+      danger: 'red',
+      info: 'slate',
+    };
+
+    const evalFromStatus: Record<string, string> = {
+      danger: 'Crítico',
+      warning: 'Atención',
+      success: 'Óptimo',
+    };
+
+    const kpis = rawKpis.map((k) => ({
+      title: String(k.title ?? k.label ?? ''),
+      value: String(k.value ?? ''),
+      subtitle: k.subtitle ? String(k.subtitle) : undefined,
+      tone: (k.tone ?? toneFromStatus[String(k.status)]) || 'emerald',
+    }));
+
+    const rows = rawKpis.map((k) => [
+      activeTabMeta?.label || 'General',
+      String(k.title ?? k.label ?? ''),
+      String(k.value ?? ''),
+      String(k.subtitle ?? '—'),
+      evalFromStatus[String(k.status)] || 'Óptimo',
+    ]);
+
+    return {
+      kpis,
+      columns: ['Dimensión', 'Indicador Clave', 'Valor Actual', 'Detalle', 'Evaluación'],
+      rows,
+      diagnosis: typeof payload?.diagnosis === 'string' ? payload.diagnosis : undefined,
+    };
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -132,42 +181,10 @@ export const AnalyticsView: React.FC = () => {
               moduleTitle={`Módulo de Analítica y Reportes - ${activeTabMeta?.label || 'Ejecutivo'}`}
               moduleSlug="analitica"
               farmName={activeFarmDisplayName}
-              kpis={[
-                {
-                  title: 'Margen Operativo',
-                  value: '68.5%',
-                  subtitle: 'Meta anual superada (>65%)',
-                  tone: 'emerald',
-                },
-                {
-                  title: 'Ocupación Pecuaria',
-                  value: '84.2%',
-                  subtitle: 'Plazas activas en producción',
-                  tone: 'emerald',
-                },
-                {
-                  title: 'Eficiencia / FCR',
-                  value: '1.42',
-                  subtitle: 'Conversión zootécnica óptima',
-                  tone: 'emerald',
-                },
-                {
-                  title: 'Cumplimiento Tareas',
-                  value: '96.8%',
-                  subtitle: 'Desempeño operativo en granja',
-                  tone: 'emerald',
-                },
-              ]}
-              diagnosis="Evaluación ejecutiva global: El rendimiento agropecuario muestra solidez financiera con márgenes operativos sobre la meta, ocupación balanceada sin sobrepoblación y un índice de cumplimiento de tareas superior al 95%, garantizando trazabilidad y rentabilidad en la operación multigranja."
-              columns={['Dimensión', 'Indicador Clave', 'Valor Actual', 'Meta de Referencia', 'Evaluación']}
-              rows={[
-                ['Financiera', 'Margen Operativo Bruto', '68.5%', '> 65.0%', 'Óptimo'],
-                ['Pecuaria', 'Tasa de Supervivencia de Lotes', '98.4%', '> 97.0%', 'Excelente'],
-                ['Infraestructura', 'Ocupación de Galpones', '84.2%', '75% - 90%', 'Equilibrado'],
-                ['Inventario', 'Rotación de Stock e Insumos', '21 días', '< 30 días', 'Controlado'],
-                ['Personal', 'Cumplimiento de Tareas a Tiempo', '96.8%', '> 90.0%', 'Sobresaliente'],
-                ['Bioseguridad', 'Protocolos Sanitarios y Cuarentena', '100%', '100%', 'Cumplido'],
-              ]}
+              kpis={[]}
+              columns={['Dimensión', 'Indicador Clave', 'Valor Actual', 'Detalle', 'Evaluación']}
+              rows={[]}
+              fetchData={buildAnalyticsPdfData}
             />
           </div>
           </div>

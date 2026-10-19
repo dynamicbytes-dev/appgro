@@ -9,10 +9,12 @@ use App\Models\Galpon;
 use App\Models\InventoryItem;
 use App\Models\InventoryLot;
 use App\Models\Lot;
+use App\Models\Module;
 use App\Models\Species;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
 
 class ExecutivePdfReportController extends Controller
@@ -57,6 +59,14 @@ class ExecutivePdfReportController extends Controller
                 'status' => 'error',
                 'message' => "Módulo no válido para reporte de KPIs ejecutivos: '{$module}'. Módulos soportados: especies, galpones, lotes, inventario, actividades, analitica.",
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Validación de acceso al módulo solicitado (excepto Root, que tiene acceso global)
+        if (! $user->isRoot() && ! $this->userCanAccessModule($user, $canonicalModule)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => "Acceso denegado: No tiene permisos para el módulo '{$module}'.",
+            ], Response::HTTP_FORBIDDEN);
         }
 
         // Resolución de la granja activa
@@ -129,6 +139,54 @@ class ExecutivePdfReportController extends Controller
             'diagnosis' => $diagnosis,
             'data' => $responseData,
         ], $extraData), Response::HTTP_OK);
+    }
+
+    /**
+     * Determina si un usuario no-root tiene acceso al módulo canónico solicitado,
+     * respetando las habilitaciones de granja (farm_modules) y, para encargados,
+     * también sus permisos individuales (subordinate_modules).
+     */
+    protected function userCanAccessModule($user, string $canonicalModule): bool
+    {
+        $codeCandidates = match ($canonicalModule) {
+            'especies' => ['species'],
+            'galpones' => ['barns', 'galpones'],
+            'lotes' => ['lots', 'lotes'],
+            'inventario' => ['inventory', 'inventario'],
+            'actividades' => ['activities', 'actividades'],
+            'analitica' => ['analytics', 'analitica'],
+            default => [],
+        };
+
+        if (empty($codeCandidates)) {
+            return false;
+        }
+
+        $moduleIds = Module::whereIn('code', $codeCandidates)->pluck('id')->toArray();
+
+        if (empty($moduleIds)) {
+            return false;
+        }
+
+        $farmEnabled = DB::table('farm_modules')
+            ->where('farm_id', $user->farm_id)
+            ->whereIn('module_id', $moduleIds)
+            ->where('is_enabled', true)
+            ->exists();
+
+        if (! $farmEnabled) {
+            return false;
+        }
+
+        if ($user->isSubordinate()) {
+            return DB::table('subordinate_modules')
+                ->where('user_id', $user->id)
+                ->whereIn('module_id', $moduleIds)
+                ->where('is_enabled', true)
+                ->exists();
+        }
+
+        return true;
     }
 
     /**

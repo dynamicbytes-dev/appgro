@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnimalService;
+use App\Models\Barn;
 use App\Models\EggProduction;
 use App\Models\Galpon;
 use App\Models\Lot;
@@ -459,6 +460,7 @@ class LotController extends Controller
         $validator = Validator::make($request->all(), [
             'galpon_id' => 'nullable|integer|exists:galpones,id',
             'potrero_id' => 'nullable|integer|exists:potreros,id',
+            'barn_id' => 'nullable|integer|exists:barns,id',
             'species_id' => 'required|integer|exists:species,id',
             'quantity' => 'required|integer|min:1',
             'purpose' => 'nullable|string|max:255',
@@ -471,6 +473,7 @@ class LotController extends Controller
         ], [
             'galpon_id.exists' => 'El galpón seleccionado no existe en el sistema.',
             'potrero_id.exists' => 'El potrero seleccionado no existe en el sistema.',
+            'barn_id.exists' => 'El galpón (barn) seleccionado no existe en el sistema.',
             'species_id.required' => 'La especie asociada es obligatoria.',
             'species_id.exists' => 'La especie seleccionada no existe en el sistema.',
             'quantity.required' => 'La cantidad de animales es obligatoria.',
@@ -505,6 +508,26 @@ class LotController extends Controller
                 ], Response::HTTP_FORBIDDEN);
             }
             $farmId = (int) $user->farm_id;
+        }
+
+        // Barn (galpón del módulo barns) opcional: debe pertenecer a la misma granja.
+        $barnId = null;
+        if ($request->filled('barn_id')) {
+            $barn = Barn::where('id', (int) $request->barn_id)
+                ->where('farm_id', $farmId)
+                ->first();
+
+            if (! $barn) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'El galpón (barn) seleccionado no pertenece a esta granja.',
+                    'errors' => [
+                        'barn_id' => ['El galpón (barn) seleccionado no pertenece a esta granja.'],
+                    ],
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $barnId = $barn->id;
         }
 
         // Especie: misma granja y activa
@@ -728,12 +751,12 @@ class LotController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $lot = DB::transaction(function () use ($request, $farmId, $galponId, $potreroId, $species, $sector, $purpose, $weanedServices) {
+        $lot = DB::transaction(function () use ($request, $farmId, $barnId, $galponId, $potreroId, $species, $sector, $purpose, $weanedServices) {
             $lot = Lot::create([
                 'farm_id' => $farmId,
                 'galpon_id' => $galponId,
                 'potrero_id' => $potreroId,
-                'barn_id' => $request->has('barn_id') ? (int) $request->barn_id : null,
+                'barn_id' => $barnId,
                 'code' => $this->generateUniqueCode(),
                 'species_id' => $species->id,
                 'sector' => $sector,

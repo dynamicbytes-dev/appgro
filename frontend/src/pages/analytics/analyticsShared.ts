@@ -1,51 +1,17 @@
 /**
  * Utilidades y paleta compartida del módulo Analítica.
+ *
+ * Los formateadores genéricos viven en `utils/format` (única fuente de verdad).
  */
+import { formatNumber } from '../../utils/format';
 
-/** Convierte cualquier valor del backend (string decimal) a número. */
-export const toNumber = (value: unknown): number => {
-  if (value === null || value === undefined || value === '') return 0;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : 0;
-};
-
-/** Formatea un monto monetario en USD. */
-export const formatMoney = (value: unknown): string => {
-  const n = toNumber(value);
-  try {
-    return new Intl.NumberFormat('es-EC', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return `$${n.toFixed(2)}`;
-  }
-};
-
-/** Formatea un entero/decimal con separador de miles. */
-export const formatNumber = (value: unknown, decimals = 0): string => {
-  const n = toNumber(value);
-  try {
-    return new Intl.NumberFormat('es-EC', {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    }).format(n);
-  } catch {
-    return n.toFixed(decimals);
-  }
-};
-
-/** Formatea un porcentaje: `42.5%`. */
-export const formatPercent = (value: unknown): string => `${formatNumber(value, 1)}%`;
-
-/** Fecha larga legible: `15 oct 2026`. */
-export const formatDate = (iso?: string | null): string => {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return String(iso);
-  return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+export {
+  toNumber,
+  formatNumber,
+  formatMoney,
+  formatPercent,
+  formatDate,
+} from '../../utils/format';
 
 /** Etiqueta compacta para ejes de gráficas: `15/10`. */
 export const formatShortDate = (iso?: string | null): string => {

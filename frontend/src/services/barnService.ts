@@ -254,7 +254,7 @@ export const barnService = {
    * Elimina un galpón de la base de datos.
    */
   delete: async (id: number | string): Promise<void> => {
-    await api.delete(`/galpones/${id}`, {
+    await api.delete(`/barns/${id}`, {
       headers: getAuthHeaders(),
     });
   },

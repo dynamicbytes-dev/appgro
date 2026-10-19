@@ -67,6 +67,21 @@ export const analyticsService = {
     });
     return response.data?.data;
   },
+
+  /**
+   * Reporte ejecutivo de KPIs (misma fuente real que alimenta el PDF) para un módulo.
+   * GET /reports/{module}/executive-kpis
+   */
+  getExecutiveKpis: async (
+    module: string,
+    farmId?: number | string
+  ): Promise<any> => {
+    const response = await api.get(`/reports/${module}/executive-kpis`, {
+      params: buildParams(farmId),
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  },
 };
 
 export default analyticsService;

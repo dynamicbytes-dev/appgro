@@ -50,6 +50,20 @@
   --color-agro-black: #1E1E1E;
   --color-agro-white: #FFFFFF;
   --color-agro-gray-light: #F9F9F9;
+
+  /* Tokens semánticos de marca (Zootika) para uso uniforme en la UI.
+     Permiten utilidades como `bg-brand`, `text-accent`, `border-line`, etc. */
+  --color-brand: #1B4D3E;
+  --color-brand-hover: #143A2F;
+  --color-brand-soft: #256653;
+  --color-accent: #4E9F3D;
+  --color-accent-hover: #3E8230;
+  --color-surface: #FFFFFF;
+  --color-surface-dark: #18221F;
+  --color-line: #E2E8F0;
+  --color-line-dark: #263632;
+  --color-ink: #1E1E1E;
+  --color-ink-soft: #64748B;
 }
 
 body {

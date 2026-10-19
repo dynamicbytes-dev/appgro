@@ -108,22 +108,15 @@ export const farmService = {
     return response.data.data;
   },
 
-  // Get modules for a farm
+  // Get modules for a farm (lectura: root cualquiera; admin/encargado solo su granja)
   getFarmModules: async (id: number | string): Promise<any> => {
     try {
       const response = await api.get(`/farms/${id}/modules`);
-      console.log('DATOS CRUDOS DE LA API (/farms/' + id + '/modules):', response.data);
       return response.data;
     } catch (err) {
-      console.warn('Fallo /farms/' + id + '/modules, intentando /root/farms/' + id + '/modules...', err);
-      try {
-        const response = await api.get(`/root/farms/${id}/modules`);
-        console.log('DATOS CRUDOS DE LA API (/root/farms/' + id + '/modules):', response.data);
-        return response.data;
-      } catch (err2) {
-        console.error('DATOS CRUDOS DE LA API ERROR:', err2);
-        throw err2;
-      }
+      // Fallback exclusivo para Root (ruta protegida por root.access)
+      const response = await api.get(`/root/farms/${id}/modules`);
+      return response.data;
     }
   },
 
@@ -144,15 +137,7 @@ export const farmService = {
       body = payloadOrModules;
     }
 
-    try {
-      const response = await api.put(`/root/farms/${id}/modules`, body);
-      return response.data?.data || response.data;
-    } catch (err: any) {
-      if (err?.response?.status === 404 || err?.response?.status === 405) {
-        const fallbackRes = await api.put(`/farms/${id}/modules`, body);
-        return fallbackRes.data?.data || fallbackRes.data;
-      }
-      throw err;
-    }
+    const response = await api.put(`/root/farms/${id}/modules`, body);
+    return response.data?.data || response.data;
   },
 };

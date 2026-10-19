@@ -11,7 +11,7 @@ import { PageHeader } from '../components/ui/PageHeader';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { Modal } from '../components/ui/Modal';
 import { SkeletonLoader } from '../components/ui/SkeletonLoader';
-import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled } from '../config/modules';
+import { SYSTEM_MODULES, normalizeModuleCode, isModuleItemEnabled, CODE_TO_MODULE_ID } from '../config/modules';
 import { safeText } from '../utils/safeText';
 import { Progress } from '../components/charts/Progress';
 import { Donut } from '../components/charts/Donut';
@@ -375,15 +375,10 @@ export const AdminDashboard: React.FC = () => {
   const handleCreateSubordinateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const CODE_TO_ID: Record<string, number> = {
-        especies: 1, species: 1,
-        galpones: 2, barns: 2,
-        lotes: 3, lots: 3,
-        actividades: 4, activities: 4,
-        analitica: 5, analytics: 5,
-      };
       const validMods = assignedModules.filter((m) => farmModules.includes(m));
-      const modIds = validMods.map((m) => CODE_TO_ID[m]).filter(Boolean);
+      const modIds = validMods
+        .map((m) => CODE_TO_MODULE_ID[m] || CODE_TO_MODULE_ID[normalizeModuleCode(m) || ''])
+        .filter(Boolean);
 
       await subordinateService.createSubordinate({
         name: subName,

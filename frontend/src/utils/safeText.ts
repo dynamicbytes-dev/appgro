@@ -53,6 +53,18 @@ export function safeText(val: any, fallback: string = ''): string {
 export const safeString = safeText;
 
 /**
+ * Devuelve un nodo apto para React: preserva elementos y arrays, y convierte
+ * objetos planos a texto mediante `safeText` (evita el crash del Virtual DOM).
+ */
+export function renderSafe(node: any): React.ReactNode {
+  if (node === null || node === undefined) return null;
+  if (React.isValidElement(node)) return node;
+  if (Array.isArray(node)) return node;
+  if (typeof node === 'object') return safeText(node);
+  return node;
+}
+
+/**
  * Robust Text component wrapper that sanitizes its children before rendering,
  * guaranteeing no raw object is ever passed into React's Text Fiber node.
  */

@@ -28,12 +28,14 @@ class AdminDashboardController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        if ($user->isAdmin() && !$user->farm_id) {
-            \Illuminate\Support\Facades\Log::warning('ADMIN WITHOUT FARM:', [
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
+        if (!$user->isAdmin() && !$user->isRoot()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Acceso denegado. Solo Administradores o Root pueden acceder al panel administrativo.',
+            ], Response::HTTP_FORBIDDEN);
+        }
 
+        if ($user->isAdmin() && !$user->farm_id) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'El usuario administrador no tiene una granja asignada.',
@@ -47,16 +49,6 @@ class AdminDashboardController extends Controller
         if ($isRoot && $request->filled('farm_id') && $request->farm_id !== 'all' && strtolower(trim((string) $request->farm_id)) !== 'all') {
             $farmId = (int) $request->query('farm_id');
         }
-
-        \Illuminate\Support\Facades\Log::info('USER LOGGED:', [
-            'user_id' => Auth::id(),
-            'farm_id' => Auth::user() ? Auth::user()->farm_id : null,
-        ]);
-        \Illuminate\Support\Facades\Log::info('MODULES FOUND:', [
-            'modules' => Auth::user() && Auth::user()->farm_id
-                ? FarmModule::where('farm_id', Auth::user()->farm_id)->get()
-                : [],
-        ]);
 
         // 1. Ensure farm_modules entries exist for this farm if farm_id is present
         if ($farmId) {

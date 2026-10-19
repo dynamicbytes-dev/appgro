@@ -230,7 +230,16 @@ export const historyService = {
   /**
    * Fetch dedicated history statistics from /history/stats or /admin/history/stats.
    */
-  getStats: async (params: { farm_id?: number | string } = {}): Promise<HistoryStats | null> => {
+  getStats: async (
+    params: {
+      farm_id?: number | string;
+      module?: string;
+      action?: string;
+      date_from?: string;
+      date_to?: string;
+      search?: string;
+    } = {}
+  ): Promise<HistoryStats | null> => {
     try {
       const response = await api.get('/history/stats', {
         params,
@@ -304,14 +313,7 @@ export const historyService = {
       });
       return response.data?.data || response.data || null;
     } catch {
-      try {
-        const fallback = await api.get(`/admin/history/${id}`, {
-          headers: getAuthHeaders(),
-        });
-        return fallback.data?.data || fallback.data || null;
-      } catch {
-        return null;
-      }
+      return null;
     }
   },
 };

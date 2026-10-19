@@ -137,19 +137,19 @@ $registerRoutes = function () {
         // Reportes Ejecutivos para Exportación PDF
         Route::get('reports/{module}/executive-kpis', [ExecutivePdfReportController::class, 'getModuleKpiReport']);
 
-        // Farm Selector for Forms & Selects
+        // Farm Selector for Forms & Selects (root: todas; no-root: solo la propia)
         Route::get('farms/select', [RootFarmController::class, 'select']);
-        Route::get('farms', [RootFarmController::class, 'index']);
 
-        // Admin Dashboard & Available Farm Modules
-        Route::get('admin/dashboard', [AdminDashboardController::class, 'index']);
-        Route::get('admin/available-modules', [SubordinateController::class, 'availableModules']);
-        Route::get('admin/subordinates', [SubordinateController::class, 'index']);
-
-        // Farm Modules Direct Access
+        // Farm Modules Read Access (ownership validado en el controlador).
+        // La escritura de módulos vive exclusivamente bajo /root/farms/{id}/modules.
         Route::get('farms/{id}/modules', [RootFarmController::class, 'getFarmModules']);
-        Route::put('farms/{id}/modules', [RootFarmController::class, 'updateFarmModules']);
-        Route::put('farms/{id}/modules/{moduleId}', [RootFarmController::class, 'updateSingleFarmModule']);
+
+        // Admin Dashboard & Available Farm Modules (solo Admin/Root)
+        Route::middleware('role.admin')->group(function () {
+            Route::get('admin/dashboard', [AdminDashboardController::class, 'index']);
+            Route::get('admin/available-modules', [SubordinateController::class, 'availableModules']);
+            Route::get('admin/subordinates', [SubordinateController::class, 'index']);
+        });
 
         // Admin Management Direct Access (Root access required)
         Route::middleware('root.access')->group(function () {
@@ -169,8 +169,8 @@ $registerRoutes = function () {
             Route::put('admin-users/{id}/status', [RootAdminController::class, 'toggleStatus']);
         });
 
-        // Subordinates / Encargados Management (Admin access)
-        Route::prefix('subordinates')->group(function () {
+        // Subordinates / Encargados Management (Admin/Root access)
+        Route::middleware('role.admin')->prefix('subordinates')->group(function () {
             Route::get('/', [SubordinateController::class, 'index']);
             Route::get('available-modules', [SubordinateController::class, 'availableModules']);
             Route::post('/', [SubordinateController::class, 'store']);
@@ -500,6 +500,9 @@ $registerRoutes = function () {
     });
 };
 
-// Register routes both with /v1 prefix and without prefix
+// Registro de rutas con y sin prefijo `/v1`.
+// El frontend por defecto usa `http://localhost:8000/api/v1` (VITE_API_URL) y
+// algunas suites/consumidores usan `/api/...` sin prefijo. Mantener ambos
+// registros preserva la compatibilidad (el grupo sin prefijo es un alias).
 Route::prefix('v1')->group($registerRoutes);
 Route::group([], $registerRoutes);

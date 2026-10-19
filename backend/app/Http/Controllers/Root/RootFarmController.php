@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Farm;
 use App\Models\Module;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
@@ -44,10 +45,26 @@ class RootFarmController extends Controller
      */
     public function select(Request $request)
     {
+        $user = Auth::user();
         $includeInactive = $request->boolean('include_inactive') || $request->boolean('all');
 
         $query = Farm::query();
-        if (!$includeInactive) {
+
+        if ($user && !$user->isRoot()) {
+            // Los usuarios no-root solo pueden seleccionar su propia granja.
+            if (!$user->farm_id) {
+                return response()->json([
+                    'success' => true,
+                    'status' => 'success',
+                    'message' => 'No hay granjas disponibles para selección.',
+                    'total' => 0,
+                    'data' => [],
+                    'farms' => [],
+                ], Response::HTTP_OK);
+            }
+
+            $query->where('id', $user->farm_id);
+        } elseif (!$includeInactive) {
             $query->where('is_active', true);
         }
 
@@ -213,6 +230,15 @@ class RootFarmController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
+        $user = Auth::user();
+        if (!$user || (!$user->isRoot() && (int) $user->farm_id !== (int) $farm->id)) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'message' => 'No tiene permisos para consultar los módulos de esta granja.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $allOfficialModules = Module::orderBy('id', 'asc')->get();
 
         $modules = $allOfficialModules->map(function ($module) use ($farm) {
@@ -307,6 +333,15 @@ class RootFarmController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
+        $user = Auth::user();
+        if (!$user || !$user->isRoot()) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'message' => 'Solo el usuario Root puede modificar los módulos de una granja.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         // 1. Support single module payload ({ module_id: X, is_enabled: Y } or { code: 'history', is_enabled: Y })
         $singleModIdent = $request->input('module_id')
             ?? $request->input('moduleId')
@@ -325,7 +360,7 @@ class RootFarmController extends Controller
                 ], Response::HTTP_NOT_FOUND);
             }
 
-            $targetFarmId = (int) ($request->input('farm_id') ?: $farm->id);
+            $targetFarmId = (int) $farm->id;
             $isEnabled = (bool) $request->input('is_enabled');
 
             DB::table('farm_modules')->updateOrInsert(
@@ -436,6 +471,15 @@ class RootFarmController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
+        $user = Auth::user();
+        if (!$user || !$user->isRoot()) {
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'message' => 'Solo el usuario Root puede modificar los módulos de una granja.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $module = $this->resolveModule($moduleId)
             ?? $this->resolveModule($request->input('module_id'))
             ?? $this->resolveModule($request->input('code'));
@@ -464,7 +508,7 @@ class RootFarmController extends Controller
         }
 
         // Strictly update or insert ONLY for this specific composite key (farm_id + module_id)
-        $targetFarmId = (int) ($request->input('farm_id') ?: $farm->id);
+        $targetFarmId = (int) $farm->id;
         $targetModuleId = (int) $module->id;
         $isEnabled = (bool) $request->is_enabled;
 

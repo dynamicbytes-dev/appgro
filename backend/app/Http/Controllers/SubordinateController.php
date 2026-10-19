@@ -84,6 +84,13 @@ class SubordinateController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
+        if (!$authUser->isAdmin() && !$authUser->isRoot()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Acceso denegado. Solo Administradores o Root pueden gestionar encargados.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         // If not root (e.g. Admin), enforce strict filtering by authenticated user's farm_id
         if (!$authUser->isRoot()) {
             if (!$authUser->farm_id) {
@@ -150,6 +157,13 @@ class SubordinateController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
+        if (!$authUser->isAdmin() && !$authUser->isRoot()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Acceso denegado. Solo Administradores o Root pueden gestionar encargados.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $hasRequestedFarm = $request->filled('farm_id')
             && $request->farm_id !== 'all'
             && strtolower(trim((string) $request->farm_id)) !== 'all';
@@ -198,6 +212,13 @@ class SubordinateController extends Controller
                 'status' => 'error',
                 'message' => 'Usuario no autenticado.',
             ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$authUser->isAdmin() && !$authUser->isRoot()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Acceso denegado. Solo Administradores o Root pueden gestionar encargados.',
+            ], Response::HTTP_FORBIDDEN);
         }
 
         $farmId = $authUser->isRoot()
@@ -305,6 +326,13 @@ class SubordinateController extends Controller
     {
         $authUser = Auth::guard('api')->user() ?? Auth::user();
 
+        if (!$authUser->isAdmin() && !$authUser->isRoot()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Acceso denegado. Solo Administradores o Root pueden gestionar encargados.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $subordinate = User::where('role', 'subordinate')
             ->with(['subordinateModules', 'farm', 'modules'])
             ->find($id);
@@ -336,6 +364,13 @@ class SubordinateController extends Controller
     public function update(Request $request, $id)
     {
         $authUser = Auth::guard('api')->user();
+
+        if (!$authUser->isAdmin() && !$authUser->isRoot()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Acceso denegado. Solo Administradores o Root pueden gestionar encargados.',
+            ], Response::HTTP_FORBIDDEN);
+        }
 
         $subordinate = User::where('role', 'subordinate')->find($id);
 

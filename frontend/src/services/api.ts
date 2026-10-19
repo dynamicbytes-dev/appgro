@@ -5,6 +5,14 @@ const REFRESH_TOKEN_KEY = 'agro_refresh_token';
 
 const USER_KEY = 'agro_user_data';
 
+/**
+ * Almacenamiento de la sesión en `localStorage`.
+ *
+ * Nota de seguridad: guardar el JWT en `localStorage` lo expone a robo vía XSS.
+ * La mitigación recomendada a futuro es migrar a cookies `HttpOnly` + `Secure`
+ * con protección CSRF (requiere cambios en el backend que emite el token).
+ * Por ahora se mantiene `localStorage` para no romper la sesión actual.
+ */
 export const tokenStorage = {
   getToken: (): string | null => {
     try {

@@ -367,14 +367,13 @@ class ActivityController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'due_date' => ['required', 'date', 'after_or_equal:today'],
+            'due_date' => ['required', 'date'],
             'assigned_to' => ['required', 'integer', 'exists:users,id'],
         ], [
             'title.required' => 'El título de la actividad es obligatorio.',
             'title.max' => 'El título no puede superar los 255 caracteres.',
             'due_date.required' => 'La fecha límite es obligatoria.',
             'due_date.date' => 'La fecha límite debe ser una fecha válida.',
-            'due_date.after_or_equal' => 'La fecha límite no puede ser anterior a hoy.',
             'assigned_to.required' => 'Debe seleccionar el subordinado que recibirá la actividad.',
             'assigned_to.exists' => 'El usuario seleccionado no existe.',
         ]);

@@ -176,7 +176,7 @@ export const Sidebar: React.FC = () => {
               <div className="px-3 text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">
                 Módulos Agropecuarios Operativos
               </div>
-              <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-1">
                 {displayModules.map((modId) => {
                   const config = SYSTEM_MODULES[modId as keyof typeof SYSTEM_MODULES];
                   if (!config && !isRoot) return null;

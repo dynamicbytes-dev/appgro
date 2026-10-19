@@ -268,26 +268,11 @@ class AuthController extends Controller
         }
 
         if (($user->isAdmin() || $user->isSubordinate()) && !$user->farm_id) {
-            \Illuminate\Support\Facades\Log::warning('USER WITHOUT FARM:', [
-                'user_id' => $user->id,
-                'email' => $user->email,
-            ]);
-
             return response()->json([
                 'status' => 'error',
                 'message' => 'El usuario no tiene una granja asignada.',
             ], Response::HTTP_FORBIDDEN);
         }
-
-        \Illuminate\Support\Facades\Log::info('USER LOGGED:', [
-            'user_id' => Auth::id(),
-            'farm_id' => Auth::user() ? Auth::user()->farm_id : null,
-        ]);
-        \Illuminate\Support\Facades\Log::info('MODULES FOUND:', [
-            'modules' => Auth::user() && Auth::user()->farm_id
-                ? \App\Models\FarmModule::where('farm_id', Auth::user()->farm_id)->get()
-                : [],
-        ]);
 
         $modules = $this->getUserModules($user) ?: [];
 

@@ -178,6 +178,29 @@ class ActivityLogController extends Controller
             $baseQuery = ActivityLog::where('farm_id', (int) $farmId)->whereNotNull('farm_id');
         }
 
+        // Filtros contextuales (los mismos del listado) para que los KPIs
+        // reflejen exactamente la selección activa del usuario.
+        if ($request->filled('module')) {
+            $baseQuery->where('module', $request->query('module'));
+        }
+        if ($request->filled('action')) {
+            $baseQuery->where('action', strtoupper($request->query('action')));
+        }
+        if ($request->filled('date_from')) {
+            $baseQuery->whereDate('created_at', '>=', $request->query('date_from'));
+        }
+        if ($request->filled('date_to')) {
+            $baseQuery->whereDate('created_at', '<=', $request->query('date_to'));
+        }
+        if ($request->filled('search')) {
+            $searchTerm = '%' . trim($request->query('search')) . '%';
+            $baseQuery->where(function ($q) use ($searchTerm) {
+                $q->where('description', 'like', $searchTerm)
+                  ->orWhere('module', 'like', $searchTerm)
+                  ->orWhere('action', 'like', $searchTerm);
+            });
+        }
+
         $totalRecords = (int) (clone $baseQuery)->count();
         $creations = (int) (clone $baseQuery)->whereIn('action', ['CREATE', 'CREAR', 'HABILITAR', 'create', 'crear', 'habilitar'])->count();
         $modifications = (int) (clone $baseQuery)->whereIn('action', ['UPDATE', 'ACTUALIZAR', 'MODIFICAR', 'update', 'actualizar', 'modificar'])->count();

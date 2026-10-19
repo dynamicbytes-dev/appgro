@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CheckModuleAccess;
+use App\Http\Middleware\EnsureIsAdminOrRoot;
 use App\Http\Middleware\EnsureIsRoot;
 use App\Http\Middleware\JwtAuthMiddleware;
 use Illuminate\Auth\AuthenticationException;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'jwt.auth' => JwtAuthMiddleware::class,
             'module.access' => CheckModuleAccess::class,
             'root.access' => EnsureIsRoot::class,
+            'role.admin' => EnsureIsAdminOrRoot::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
