@@ -56,5 +56,42 @@ class RootProvider extends ChangeNotifier {
       return false;
     }
   }
-}
 
+  Future<bool> createAdmin(Map<String, dynamic> payload) async {
+    try {
+      final admin = await _repository.createAdmin(payload);
+      _admins.insert(0, admin);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> toggleAdminStatus(int id) async {
+    try {
+      await _repository.toggleAdminStatus(id);
+      await loadRootData();
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getFarmModules(int farmId) async {
+    return await _repository.getFarmModules(farmId);
+  }
+
+  Future<bool> updateFarmModules(int farmId, List<int> moduleIds) async {
+    try {
+      await _repository.updateFarmModules(farmId, moduleIds);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+}

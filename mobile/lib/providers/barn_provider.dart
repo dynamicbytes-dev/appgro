@@ -44,6 +44,51 @@ class BarnProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateGalpon(int id, Map<String, dynamic> payload) async {
+    try {
+      final updated = await _repository.updateGalpon(id, payload);
+      final idx = _galpones.indexWhere((g) => g.id == id);
+      if (idx != -1) {
+        _galpones[idx] = updated;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> toggleStatus(int id) async {
+    try {
+      final updated = await _repository.toggleGalponStatus(id);
+      final idx = _galpones.indexWhere((g) => g.id == id);
+      if (idx != -1) {
+        _galpones[idx] = updated;
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteGalpon(int id) async {
+    try {
+      await _repository.deleteGalpon(id);
+      _galpones.removeWhere((g) => g.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> recordEggHarvest(int galponId, Map<String, dynamic> payload) async {
     try {
       await _repository.recordEggProduction(galponId, payload);
@@ -55,4 +100,3 @@ class BarnProvider extends ChangeNotifier {
     }
   }
 }
-

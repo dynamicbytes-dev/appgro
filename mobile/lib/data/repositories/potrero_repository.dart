@@ -23,5 +23,46 @@ class PotreroRepository {
     final data = response['data'] ?? response;
     return PotreroModel.fromJson(data);
   }
-}
 
+  Future<PotreroModel> updatePotrero(int id, Map<String, dynamic> payload) async {
+    final response = await _apiClient.put('${ApiEndpoints.potreros}/$id', body: payload);
+    final data = response['data'] ?? response;
+    return PotreroModel.fromJson(data);
+  }
+
+  Future<PotreroModel> togglePotreroStatus(int id) async {
+    final response = await _apiClient.patch('${ApiEndpoints.potreros}/$id/status', body: {});
+    final data = response['data'] ?? response;
+    return PotreroModel.fromJson(data);
+  }
+
+  Future<void> deletePotrero(int id) async {
+    await _apiClient.delete('${ApiEndpoints.potreros}/$id');
+  }
+
+  Future<List<Map<String, dynamic>>> getBiomassSurveys(int potreroId) async {
+    final response = await _apiClient.get('${ApiEndpoints.potreros}/$potreroId/biomass-surveys');
+    final rawList = response is Map<String, dynamic> && response['data'] is List
+        ? response['data'] as List
+        : (response is List ? response : []);
+
+    return rawList.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<void> recordBiomassSurvey(int potreroId, Map<String, dynamic> payload) async {
+    await _apiClient.post('${ApiEndpoints.potreros}/$potreroId/biomass-surveys', body: payload);
+  }
+
+  Future<List<Map<String, dynamic>>> getTreatments(int potreroId) async {
+    final response = await _apiClient.get('${ApiEndpoints.potreros}/$potreroId/treatments');
+    final rawList = response is Map<String, dynamic> && response['data'] is List
+        ? response['data'] as List
+        : (response is List ? response : []);
+
+    return rawList.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<void> recordTreatment(int potreroId, Map<String, dynamic> payload) async {
+    await _apiClient.post('${ApiEndpoints.potreros}/$potreroId/treatments', body: payload);
+  }
+}

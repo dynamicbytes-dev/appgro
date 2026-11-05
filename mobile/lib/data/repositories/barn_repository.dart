@@ -24,8 +24,23 @@ class BarnRepository {
     return GalponModel.fromJson(data);
   }
 
+  Future<GalponModel> updateGalpon(int id, Map<String, dynamic> payload) async {
+    final response = await _apiClient.put('${ApiEndpoints.galpones}/$id', body: payload);
+    final data = response['data'] ?? response;
+    return GalponModel.fromJson(data);
+  }
+
+  Future<GalponModel> toggleGalponStatus(int id) async {
+    final response = await _apiClient.patch('${ApiEndpoints.galpones}/$id/status', body: {});
+    final data = response['data'] ?? response;
+    return GalponModel.fromJson(data);
+  }
+
+  Future<void> deleteGalpon(int id) async {
+    await _apiClient.delete('${ApiEndpoints.galpones}/$id');
+  }
+
   Future<void> recordEggProduction(int galponId, Map<String, dynamic> payload) async {
     await _apiClient.post(ApiEndpoints.galponEggs(galponId), body: payload);
   }
 }
-

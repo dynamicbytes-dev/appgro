@@ -111,6 +111,7 @@ class _RootDashboardScreenState extends State<RootDashboardScreen> {
                     subtitle: 'Dueños de finca',
                     icon: Icons.manage_accounts,
                     iconColor: AppColors.accent,
+                    onTap: () => context.go('/root/admins'),
                   ),
                 ),
               ],

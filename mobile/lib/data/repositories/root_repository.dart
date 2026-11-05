@@ -39,5 +39,29 @@ class RootRepository {
     final data = response['data'] ?? response;
     return FarmModel.fromJson(data);
   }
-}
 
+  Future<UserModel> createAdmin(Map<String, dynamic> payload) async {
+    final response = await _apiClient.post(ApiEndpoints.rootAdmins, body: payload);
+    final data = response['data'] ?? response;
+    return UserModel.fromJson(data);
+  }
+
+  Future<void> toggleAdminStatus(int id) async {
+    await _apiClient.post('${ApiEndpoints.rootAdmins}/$id/toggle-status');
+  }
+
+  Future<List<Map<String, dynamic>>> getFarmModules(int farmId) async {
+    final response = await _apiClient.get(ApiEndpoints.rootFarmModules(farmId));
+    final rawList = response is Map<String, dynamic> && response['data'] is List
+        ? response['data'] as List
+        : (response is List ? response : []);
+
+    return rawList.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<void> updateFarmModules(int farmId, List<int> moduleIds) async {
+    await _apiClient.put(ApiEndpoints.rootFarmModules(farmId), body: {
+      'module_ids': moduleIds,
+    });
+  }
+}

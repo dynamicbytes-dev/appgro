@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -10,6 +11,7 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final notifProvider = context.watch<NotificationProvider>();
     final user = authProvider.user;
 
     return Drawer(
@@ -25,7 +27,7 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
             accountName: Text(
-              user?.fullName ?? 'Usuario AppGro',
+              user?.fullName ?? 'Usuario Zootika',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             accountEmail: Column(
@@ -52,7 +54,7 @@ class AppDrawer extends StatelessWidget {
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
               child: Text(
-                user != null && user.name.isNotEmpty ? user.name[0].toUpperCase() : 'A',
+                user != null && user.name.isNotEmpty ? user.name[0].toUpperCase() : 'Z',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -123,6 +125,14 @@ class AppDrawer extends StatelessWidget {
                       context.go('/root/farms');
                     },
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.manage_accounts, color: AppColors.primary),
+                    title: const Text('Administradores Globales'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.go('/root/admins');
+                    },
+                  ),
                 ],
 
                 const Divider(),
@@ -140,6 +150,14 @@ class AppDrawer extends StatelessWidget {
                 ),
 
                 ListTile(
+                  leading: const Icon(Icons.category, color: Colors.indigo),
+                  title: const Text('Especies y Razas'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/modules/species');
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.grass, color: AppColors.success),
                   title: const Text('Potreros y Pasturas'),
                   onTap: () {
@@ -149,14 +167,14 @@ class AppDrawer extends StatelessWidget {
                 ),
                 ListTile(
                   leading: const Icon(Icons.pets, color: AppColors.secondary),
-                  title: const Text('Lotes de Ganado'),
+                  title: const Text('Lotes y Animales'),
                   onTap: () {
                     Navigator.pop(context);
                     context.go('/modules/lots');
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.warehouse, color: AppColors.warning),
+                  leading: const Icon(Icons.home_work, color: AppColors.warning),
                   title: const Text('Galpones e Instalaciones'),
                   onTap: () {
                     Navigator.pop(context);
@@ -171,8 +189,66 @@ class AppDrawer extends StatelessWidget {
                     context.go('/modules/inventory');
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.analytics, color: Colors.purple),
+                  title: const Text('Analítica y KPIs'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/modules/analytics');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.history, color: Colors.brown),
+                  title: const Text('Auditoría e Historial'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/modules/history');
+                  },
+                ),
 
                 const Divider(),
+                ListTile(
+                  leading: Stack(
+                    children: [
+                      const Icon(Icons.notifications_outlined),
+                      if (notifProvider.unreadCount > 0)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  title: const Text('Notificaciones'),
+                  trailing: notifProvider.unreadCount > 0
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.error,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${notifProvider.unreadCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : null,
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/notifications');
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.person_outline),
                   title: const Text('Mi Perfil'),
@@ -201,4 +277,3 @@ class AppDrawer extends StatelessWidget {
     );
   }
 }
-

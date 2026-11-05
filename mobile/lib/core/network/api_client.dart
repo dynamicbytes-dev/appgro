@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../constants/api_endpoints.dart';
 import '../network/api_exception.dart';
 import '../storage/token_storage.dart';
 
@@ -19,13 +20,20 @@ class ApiClient {
     return headers;
   }
 
+  ApiException _handleSocketException(String url) {
+    return ApiException(
+      message: 'No se pudo conectar al servidor (${ApiEndpoints.baseUrl}).\n'
+          'Verifique el cable USB o toque el ícono de Ajustes (arriba a la derecha) para configurar la IP del servidor.',
+    );
+  }
+
   Future<dynamic> get(String url) async {
     try {
       final headers = await _headers();
       final response = await _client.get(Uri.parse(url), headers: headers);
       return _processResponse(response);
     } on SocketException {
-      throw ApiException(message: 'Sin conexión a internet. Verifique su red.');
+      throw _handleSocketException(url);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(message: 'Error al conectar con el servidor: $e');
@@ -42,7 +50,7 @@ class ApiClient {
       );
       return _processResponse(response);
     } on SocketException {
-      throw ApiException(message: 'Sin conexión a internet. Verifique su red.');
+      throw _handleSocketException(url);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(message: 'Error al conectar con el servidor: $e');
@@ -59,7 +67,24 @@ class ApiClient {
       );
       return _processResponse(response);
     } on SocketException {
-      throw ApiException(message: 'Sin conexión a internet. Verifique su red.');
+      throw _handleSocketException(url);
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException(message: 'Error al conectar con el servidor: $e');
+    }
+  }
+
+  Future<dynamic> patch(String url, {Map<String, dynamic>? body}) async {
+    try {
+      final headers = await _headers();
+      final response = await _client.patch(
+        Uri.parse(url),
+        headers: headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
+      return _processResponse(response);
+    } on SocketException {
+      throw _handleSocketException(url);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(message: 'Error al conectar con el servidor: $e');
@@ -72,7 +97,7 @@ class ApiClient {
       final response = await _client.delete(Uri.parse(url), headers: headers);
       return _processResponse(response);
     } on SocketException {
-      throw ApiException(message: 'Sin conexión a internet. Verifique su red.');
+      throw _handleSocketException(url);
     } catch (e) {
       if (e is ApiException) rethrow;
       throw ApiException(message: 'Error al conectar con el servidor: $e');
@@ -99,14 +124,6 @@ class ApiClient {
         ? jsonBody['errors'] as Map<String, dynamic>
         : null;
 
-    if (response.statusCode == 401) {
-      TokenStorage.clearAll();
-      throw ApiException(
-        message: 'Sesión expirada o no autorizada.',
-        statusCode: 401,
-      );
-    }
-
     throw ApiException(
       message: message,
       statusCode: response.statusCode,
@@ -114,4 +131,3 @@ class ApiClient {
     );
   }
 }
-

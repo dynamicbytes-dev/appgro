@@ -43,17 +43,27 @@ class ActivityRepository {
     return ActivityModel.fromJson(data);
   }
 
+  Future<ActivityModel> updateActivity({
+    required int id,
+    Map<String, dynamic>? data,
+  }) async {
+    final response = await _apiClient.put(
+      ApiEndpoints.activityDetail(id),
+      body: data ?? {},
+    );
+
+    final resData = response['data'] ?? response;
+    return ActivityModel.fromJson(resData);
+  }
+
   Future<ActivityModel> updateActivityStatus({
     required int id,
     required String status,
   }) async {
-    final response = await _apiClient.put(
-      ApiEndpoints.activityDetail(id),
-      body: {'status': status},
-    );
+    return await updateActivity(id: id, data: {'status': status});
+  }
 
-    final data = response['data'] ?? response;
-    return ActivityModel.fromJson(data);
+  Future<void> deleteActivity(int id) async {
+    await _apiClient.delete(ApiEndpoints.activityDetail(id));
   }
 }
-

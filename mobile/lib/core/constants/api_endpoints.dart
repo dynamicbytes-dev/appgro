@@ -1,11 +1,27 @@
-class ApiEndpoints {
-  // En Android Emulator usar 10.0.2.2:8000, en iOS Simulator localhost:8000
-  // o la IP local de la red para dispositivos físicos.
-  static String baseUrl = 'http://10.0.2.2:8000/api/v1';
+import 'package:shared_preferences/shared_preferences.dart';
 
-  // Configurar URL en tiempo de ejecución si se requiere
-  static void setBaseUrl(String url) {
-    baseUrl = url;
+class ApiEndpoints {
+  // Con 'adb reverse tcp:8000 tcp:8000', el celular físico accede directamente
+  // a la API de la Mac usando localhost:8000 a través del cable USB.
+  // También se puede usar la IP Wi-Fi de la Mac: http://192.168.1.11:8000/api/v1
+  static String baseUrl = 'http://localhost:8000/api/v1';
+
+  static Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUrl = prefs.getString('custom_server_url');
+      if (savedUrl != null && savedUrl.trim().isNotEmpty) {
+        baseUrl = savedUrl.trim();
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> setBaseUrl(String url) async {
+    baseUrl = url.trim();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('custom_server_url', baseUrl);
+    } catch (_) {}
   }
 
   // Auth
@@ -39,4 +55,3 @@ class ApiEndpoints {
   static String get activities => '$baseUrl/activities';
   static String activityDetail(int id) => '$baseUrl/activities/$id';
 }
-

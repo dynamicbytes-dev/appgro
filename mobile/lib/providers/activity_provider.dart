@@ -63,6 +63,22 @@ class ActivityProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateActivity(int id, Map<String, dynamic> data) async {
+    try {
+      final updated = await _repository.updateActivity(id: id, data: data);
+      final index = _activities.indexWhere((a) => a.id == id);
+      if (index != -1) {
+        _activities[index] = updated;
+        notifyListeners();
+      }
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> updateStatus(int id, String newStatus) async {
     try {
       final updated = await _repository.updateActivityStatus(id: id, status: newStatus);
@@ -78,5 +94,17 @@ class ActivityProvider extends ChangeNotifier {
       return false;
     }
   }
-}
 
+  Future<bool> deleteActivity(int id) async {
+    try {
+      await _repository.deleteActivity(id);
+      _activities.removeWhere((a) => a.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+}
