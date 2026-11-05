@@ -111,6 +111,15 @@ appgro/
 │   │   └── types/             # Definiciones e interfaces de TypeScript
 │   └── public/                # Recursos estáticos, logos e iconografía
 │
+├── mobile/                     # Aplicación Móvil Nativa (Flutter 3.x / Dart)
+│   ├── lib/
+│   │   ├── core/              # Red, almacenamiento seguro JWT, temas y constantes
+│   │   ├── data/              # Modelos y repositorios de consumo de la API REST
+│   │   ├── providers/         # Estado de la app (ViewModels / ChangeNotifier)
+│   │   ├── routing/           # Enrutamiento protegido por roles (GoRouter)
+│   │   └── ui/                # Vistas para Encargado, Admin, Root y módulos de campo
+│   └── test/                  # Pruebas unitarias de serialización y componentes UI
+│
 ├── .gitignore                  # Reglas de exclusión de Git
 └── README.md                   # Documentación principal del proyecto
 ```
